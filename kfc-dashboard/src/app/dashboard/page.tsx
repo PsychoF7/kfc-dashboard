@@ -10,9 +10,21 @@ const money = (n: number | null | undefined) =>
 const int = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString("es-MX"));
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(1)}%`);
 
+// Espera un momento antes de aplicar cambios rápidos (arrastrar, teclear
+// en la búsqueda, etc.) para no disparar una petición por cada pixel/tecla.
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export default function DashboardPage() {
   const [options, setOptions] = useState<FilterOptions | null>(null);
   const [filters, setFilters] = useState<DashboardFilters>(EMPTY_FILTERS);
+  const debouncedFilters = useDebouncedValue(filters, 400);
   const [kpis, setKpis] = useState<KpiSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,19 +37,20 @@ export default function DashboardPage() {
   }, []);
 
   const queryString = useMemo(() => {
+    const f = debouncedFilters;
     const params = new URLSearchParams();
-    if (filters.date_from) params.set("date_from", filters.date_from);
-    if (filters.date_to) params.set("date_to", filters.date_to);
-    if (filters.ciudad) params.set("ciudad", filters.ciudad);
-    if (filters.restaurant) params.set("restaurant", filters.restaurant);
-    if (filters.zona) params.set("zona", filters.zona);
-    if (filters.estatus) params.set("estatus", filters.estatus);
-    if (filters.repartido_por) params.set("repartido_por", filters.repartido_por);
-    if (filters.orden_planeada) params.set("orden_planeada", filters.orden_planeada);
-    if (filters.price_min) params.set("price_min", String(filters.price_min));
-    if (filters.price_max) params.set("price_max", String(filters.price_max));
+    if (f.date_from) params.set("date_from", f.date_from);
+    if (f.date_to) params.set("date_to", f.date_to);
+    f.ciudad.forEach((v) => params.append("ciudad", v));
+    f.restaurant.forEach((v) => params.append("restaurant", v));
+    f.zona.forEach((v) => params.append("zona", v));
+    f.estatus.forEach((v) => params.append("estatus", v));
+    f.repartido_por.forEach((v) => params.append("repartido_por", v));
+    if (f.orden_planeada) params.set("orden_planeada", f.orden_planeada);
+    if (f.price_min != null) params.set("price_min", String(f.price_min));
+    if (f.price_max != null) params.set("price_max", String(f.price_max));
     return params.toString();
-  }, [filters]);
+  }, [debouncedFilters]);
 
   useEffect(() => {
     setLoading(true);
@@ -57,7 +70,9 @@ export default function DashboardPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-ink-900">Panel principal</h1>
-          <p className="text-sm text-ink-500">Resumen general de la operación de delivery.</p>
+          <p className="text-sm text-ink-500">
+            Resumen general de la operación de delivery — solo tiendas KFC.
+          </p>
         </div>
       </div>
 
@@ -66,7 +81,6 @@ export default function DashboardPage() {
         filters={filters}
         onChange={setFilters}
         onClear={() => setFilters(EMPTY_FILTERS)}
-        priceBounds={[0, 2000]}
       />
 
       {error && (
