@@ -22,6 +22,25 @@ interface FilaDesglose {
   deposito_envios_tarjeta: number;
 }
 
+interface TiendaTrend {
+  restaurant: string;
+  monto_actual: number;
+  monto_anterior: number;
+  diferencia: number;
+  pct_cambio: number | null;
+  dejo_de_operar: boolean;
+}
+
+interface HistoricoFila {
+  id: string;
+  semana_inicio: string;
+  semana_fin: string;
+  categoria: string;
+  efectivo_depositar: number;
+  total_envio: number;
+  estado: string;
+}
+
 const CATEGORIA_LABEL: Record<string, string> = {
   general: "General",
   delivery: "Delivery",
@@ -29,6 +48,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
 };
 
 const UMBRAL_DIFERENCIA = 5;
+const TOP_N = 5;
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
@@ -45,8 +65,15 @@ export default function PagosPage() {
   const [anchorDate, setAnchorDate] = useState("");
   const [dias, setDias] = useState<DiaComparativa[] | null>(null);
   const [filas, setFilas] = useState<FilaDesglose[] | null>(null);
+  const [tiendas, setTiendas] = useState<TiendaTrend[] | null>(null);
+  const [notas, setNotas] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [guardadoOk, setGuardadoOk] = useState(false);
+
+  const [historico, setHistorico] = useState<HistoricoFila[] | null>(null);
+  const [filtroSemana, setFiltroSemana] = useState("");
 
   const week = useMemo(() => (anchorDate ? getWeekRange(anchorDate) : null), [anchorDate]);
 
@@ -54,6 +81,7 @@ export default function PagosPage() {
     if (!week) return;
     setLoading(true);
     setError(null);
+    setGuardadoOk(false);
 
     Promise.all([
       fetch(`/api/pagos/comparativa?week_start=${week.start}&week_end=${week.end}`, {
@@ -62,32 +90,106 @@ export default function PagosPage() {
       fetch(`/api/pagos/desglose?week_start=${week.start}&week_end=${week.end}`, {
         cache: "no-store",
       }).then((r) => r.json()),
+      fetch(`/api/pagos/tendencia?week_start=${week.start}&week_end=${week.end}`, {
+        cache: "no-store",
+      }).then((r) => r.json()),
+      fetch(`/api/pagos/notas?week_start=${week.start}`, { cache: "no-store" }).then((r) =>
+        r.json()
+      ),
     ])
-      .then(([comparativa, desglose]) => {
+      .then(([comparativa, desglose, tendencia, notasRes]) => {
         if (comparativa?.error) throw new Error(comparativa.error);
         if (desglose?.error) throw new Error(desglose.error);
+        if (tendencia?.error) throw new Error(tendencia.error);
         setDias(comparativa.dias);
         setFilas(desglose.filas);
+        setTiendas(tendencia.tiendas);
+        const notasMap: Record<string, string> = {};
+        (notasRes.notas ?? []).forEach((n: { restaurant: string; nota: string | null }) => {
+          notasMap[n.restaurant] = n.nota ?? "";
+        });
+        setNotas(notasMap);
       })
       .catch((e) => setError(e.message ?? "No se pudo calcular el desglose."))
       .finally(() => setLoading(false));
   }, [week]);
+
+  useEffect(() => {
+    const url = filtroSemana
+      ? `/api/pagos/historico?week_start=${filtroSemana}`
+      : "/api/pagos/historico";
+    fetch(url, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => setHistorico(res.filas ?? []))
+      .catch(() => setHistorico([]));
+  }, [filtroSemana, guardadoOk]);
+
+  async function guardarHistorico() {
+    if (!week || !filas) return;
+    setGuardando(true);
+    try {
+      const res = await fetch("/api/pagos/historico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week_start: week.start, week_end: week.end, filas }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setGuardadoOk(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar en el histórico.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function guardarNota(restaurant: string, nota: string) {
+    if (!week) return;
+    try {
+      await fetch("/api/pagos/notas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ week_start: week.start, restaurant, nota }),
+      });
+    } catch {
+      // silencioso: si falla, el valor se queda visible y se puede reintentar al perder foco de nuevo
+    }
+  }
 
   const totalVentas = dias?.reduce((s, d) => s + d.en_ventas, 0) ?? 0;
   const totalOps = dias?.reduce((s, d) => s + d.en_operaciones, 0) ?? 0;
   const diferenciaTotal = Math.abs(totalVentas - totalOps);
   const hayQueRevisar = diferenciaTotal > UMBRAL_DIFERENCIA;
 
+  const totalActual = tiendas?.reduce((s, t) => s + t.monto_actual, 0) ?? 0;
+  const totalAnterior = tiendas?.reduce((s, t) => s + t.monto_anterior, 0) ?? 0;
+  const pctCambioTotal =
+    totalAnterior > 0 ? ((totalActual - totalAnterior) / totalAnterior) * 100 : null;
+  const tiendasDetenidas = tiendas?.filter((t) => t.dejo_de_operar) ?? [];
+  const tiendasSubieron = (tiendas ?? [])
+    .filter((t) => !t.dejo_de_operar && t.diferencia > 0)
+    .sort((a, b) => b.diferencia - a.diferencia)
+    .slice(0, TOP_N);
+  const tiendasBajaron = (tiendas ?? [])
+    .filter((t) => !t.dejo_de_operar && t.diferencia < 0)
+    .sort((a, b) => a.diferencia - b.diferencia)
+    .slice(0, TOP_N);
+
+  const semanasDisponibles = Array.from(
+    new Set((historico ?? []).map((h) => h.semana_inicio))
+  ).sort((a, b) => b.localeCompare(a));
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <h1 className="text-xl font-semibold text-ink-900">Desglose de pagos</h1>
       <p className="mt-1 text-sm text-ink-500">
-        Comparativa Ventas vs Operaciones y el desglose General / Delivery / Mi Flotilla de una
-        semana.
+        Comparativa Ventas vs Operaciones, el desglose semanal, y su histórico.
       </p>
 
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-4 shadow-card">
-        <label className="text-xs font-medium text-ink-500">Elige cualquier día de la semana a revisar</label>
+        <label className="text-xs font-medium text-ink-500">
+          Elige cualquier día de la semana a revisar
+        </label>
         <input
           type="date"
           value={anchorDate}
@@ -125,9 +227,7 @@ export default function PagosPage() {
             </p>
             <p>
               <span className="text-ink-500">Diferencia: </span>
-              <span
-                className={`font-semibold ${hayQueRevisar ? "text-danger" : "text-success"}`}
-              >
+              <span className={`font-semibold ${hayQueRevisar ? "text-danger" : "text-success"}`}>
                 {int(diferenciaTotal)}
               </span>
             </p>
@@ -174,7 +274,21 @@ export default function PagosPage() {
 
       {week && !loading && filas && (
         <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-ink-900">Desglose de la semana</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink-900">Desglose de la semana</h2>
+            <button
+              onClick={guardarHistorico}
+              disabled={guardando}
+              className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+            >
+              {guardando ? "Guardando…" : "Guardar en histórico"}
+            </button>
+          </div>
+          {guardadoOk && (
+            <p className="mt-2 text-xs font-medium text-success">
+              ✓ Semana guardada en el histórico.
+            </p>
+          )}
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -209,10 +323,98 @@ export default function PagosPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-xs text-ink-500">
-            "Delivery + Mi Flotilla" debe sumar lo mismo que "General" en cada columna — es una
-            forma rápida de verificar que el desglose está cuadrado.
-          </p>
+        </div>
+      )}
+
+      {week && !loading && tiendas && (
+        <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
+          <h2 className="text-sm font-semibold text-ink-900">Comparativo vs. semana anterior</h2>
+
+          <div className="mt-3 flex flex-wrap items-baseline gap-3">
+            <span className="text-2xl font-semibold text-ink-900">{money(totalActual)}</span>
+            <span className="text-sm text-ink-500">vs {money(totalAnterior)} la semana pasada</span>
+            {pctCambioTotal != null && (
+              <span
+                className={`text-sm font-semibold ${
+                  pctCambioTotal >= 0 ? "text-success" : "text-danger"
+                }`}
+              >
+                {pctCambioTotal >= 0 ? "▲" : "▼"} {Math.abs(pctCambioTotal).toFixed(1)}%
+              </span>
+            )}
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                Tiendas que más subieron
+              </h3>
+              {tiendasSubieron.length === 0 ? (
+                <p className="mt-2 text-xs text-ink-500">Ninguna tienda subió esta semana.</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5">
+                  {tiendasSubieron.map((t) => (
+                    <li key={t.restaurant} className="flex justify-between text-xs">
+                      <span className="truncate pr-2 text-ink-700">{t.restaurant}</span>
+                      <span className="flex-shrink-0 font-medium text-success">
+                        +{money(t.diferencia)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                Tiendas que más bajaron
+              </h3>
+              {tiendasBajaron.length === 0 ? (
+                <p className="mt-2 text-xs text-ink-500">Ninguna tienda bajó esta semana.</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5">
+                  {tiendasBajaron.map((t) => (
+                    <li key={t.restaurant} className="flex justify-between text-xs">
+                      <span className="truncate pr-2 text-ink-700">{t.restaurant}</span>
+                      <span className="flex-shrink-0 font-medium text-danger">
+                        {money(t.diferencia)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {tiendasDetenidas.length > 0 && (
+            <div className="mt-6 rounded-lg border border-warning bg-warning-bg p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">
+                Tiendas que dejaron de operar esta semana
+              </h3>
+              <p className="mt-1 text-xs text-ink-700">
+                Tuvieron ventas la semana pasada y esta semana no registran nada. Agrega una nota
+                si ya sabes el motivo (para revisar con KFC).
+              </p>
+              <div className="mt-3 space-y-2">
+                {tiendasDetenidas.map((t) => (
+                  <div key={t.restaurant} className="flex flex-col gap-1 sm:flex-row sm:items-center">
+                    <span className="text-sm text-ink-900 sm:w-72 sm:flex-shrink-0">
+                      {t.restaurant}
+                      <span className="ml-2 text-xs text-ink-500">
+                        (tenía {money(t.monto_anterior)})
+                      </span>
+                    </span>
+                    <input
+                      type="text"
+                      defaultValue={notas[t.restaurant] ?? ""}
+                      onBlur={(e) => guardarNota(t.restaurant, e.target.value)}
+                      placeholder="Nota / motivo (opcional)"
+                      className="flex-1 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -221,6 +423,63 @@ export default function PagosPage() {
           Elige un día de la semana que quieras revisar para ver la comparativa y el desglose.
         </p>
       )}
+
+      <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink-900">Histórico de semanas guardadas</h2>
+          {semanasDisponibles.length > 0 && (
+            <select
+              value={filtroSemana}
+              onChange={(e) => setFiltroSemana(e.target.value)}
+              className="rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+            >
+              <option value="">Todas las semanas</option>
+              {semanasDisponibles.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {!historico || historico.length === 0 ? (
+          <p className="mt-3 text-xs text-ink-500">
+            Todavía no has guardado ninguna semana. Usa el botón "Guardar en histórico" de arriba.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
+                  <th className="py-2 pr-4">Semana</th>
+                  <th className="py-2 pr-4">Desglose</th>
+                  <th className="py-2 pr-4 text-right">Total envío</th>
+                  <th className="py-2 pr-4 text-right">Efectivo a depositar</th>
+                  <th className="py-2 pr-4">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historico.map((h) => (
+                  <tr key={h.id} className="border-b border-ink-100 last:border-0">
+                    <td className="py-2 pr-4 text-ink-700">
+                      {h.semana_inicio} → {h.semana_fin}
+                    </td>
+                    <td className="py-2 pr-4 font-medium text-ink-900">
+                      {CATEGORIA_LABEL[h.categoria] ?? h.categoria}
+                    </td>
+                    <td className="py-2 pr-4 text-right text-ink-700">{money(h.total_envio)}</td>
+                    <td className="py-2 pr-4 text-right font-semibold text-ink-900">
+                      {money(h.efectivo_depositar)}
+                    </td>
+                    <td className="py-2 pr-4 text-xs text-ink-500">{h.estado}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
