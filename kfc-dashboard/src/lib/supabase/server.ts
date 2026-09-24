@@ -15,5 +15,11 @@ export function getSupabaseAdmin() {
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
+    // Vercel guarda en caché las llamadas fetch salientes por default.
+    // Esto lo desactiva para TODO lo que este cliente le pida a Supabase,
+    // para que siempre traiga datos frescos y no una respuesta vieja.
+    global: {
+      fetch: (url, options = {}) => fetch(url, { ...options, cache: "no-store" }),
+    },
   });
 }
