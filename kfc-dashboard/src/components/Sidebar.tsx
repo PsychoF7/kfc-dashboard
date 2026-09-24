@@ -7,12 +7,12 @@ import clsx from "clsx";
 const AVAILABLE = [
   { href: "/dashboard", label: "Panel principal" },
   { href: "/upload", label: "Cargar datos" },
+  { href: "/pagos", label: "Desglose de pagos" },
 ];
 
 // Estas secciones son las fases siguientes del proyecto — se muestran
 // para que el roadmap sea transparente, pero aún no están construidas.
 const ROADMAP = [
-  "Desglose de pagos",
   "Facturación mensual",
   "Devoluciones y cancelaciones",
   "Análisis de tiempos",
