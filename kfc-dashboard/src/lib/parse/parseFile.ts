@@ -77,10 +77,17 @@ function parseDateValue(value: unknown): string | null {
 }
 
 function parseBooleanValue(value: unknown): boolean | null {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined) return null;
+  if (typeof value === "number") return value !== 0;
   const str = String(value).trim().toLowerCase();
-  if (["true", "si", "sí", "1", "yes", "verdadero"].includes(str)) return true;
-  if (["false", "no", "0"].includes(str)) return false;
+  // En blanco significa "no marcado" (false), no "desconocido" — así viene
+  // representado en el archivo (solo escriben algo cuando SÍ aplica).
+  if (str === "") return false;
+  if (["true", "si", "sí", "yes", "verdadero"].includes(str)) return true;
+  if (["false", "no"].includes(str)) return false;
+  // Algunos exports guardan 1/0 como "1.0"/"0.0" en vez de "1"/"0".
+  const num = Number(str);
+  if (!isNaN(num)) return num !== 0;
   return null;
 }
 
