@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.rpc("get_ops_filter_options").single();
+  const { data, error } = await supabase.rpc("get_ops_filter_options");
 
   if (error) {
     console.error("Error en /api/filters:", error);
