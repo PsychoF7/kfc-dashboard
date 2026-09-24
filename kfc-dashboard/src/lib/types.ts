@@ -9,14 +9,14 @@ export interface FilterOptions {
 export interface DashboardFilters {
   date_from: string; // yyyy-mm-dd
   date_to: string; // yyyy-mm-dd
-  ciudad: string;
-  restaurant: string;
-  zona: string;
-  estatus: string;
-  repartido_por: string;
+  ciudad: string[];
+  restaurant: string[];
+  zona: string[];
+  estatus: string[];
+  repartido_por: string[];
   orden_planeada: string; // "" | "true" | "false"
-  price_min: number;
-  price_max: number;
+  price_min: number | null;
+  price_max: number | null;
 }
 
 export interface KpiSummary {
@@ -37,12 +37,12 @@ export interface KpiSummary {
 export const EMPTY_FILTERS: DashboardFilters = {
   date_from: "",
   date_to: "",
-  ciudad: "",
-  restaurant: "",
-  zona: "",
-  estatus: "",
-  repartido_por: "",
+  ciudad: [],
+  restaurant: [],
+  zona: [],
+  estatus: [],
+  repartido_por: [],
   orden_planeada: "",
-  price_min: 0,
-  price_max: 2000,
+  price_min: null,
+  price_max: null,
 };
