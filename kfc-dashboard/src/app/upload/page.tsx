@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
+import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Tipo = "ops" | "ventas";
 
@@ -13,21 +14,50 @@ interface UploadResult {
   filename?: string;
 }
 
+const BUCKET = "raw-uploads";
+
+function sanitizeFilename(name: string) {
+  // Supabase Storage no acepta ciertos caracteres/espacios de forma
+  // confiable en las rutas — los reemplazamos para evitar errores raros.
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; description: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<"idle" | "uploading" | "processing">("idle");
   const [result, setResult] = useState<UploadResult | null>(null);
 
   async function handleUpload() {
     if (!file) return;
     setLoading(true);
     setResult(null);
+
+    const path = `${tipo}/${Date.now()}-${sanitizeFilename(file.name)}`;
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("tipo", tipo);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      // 1) Subir el archivo DIRECTO a Supabase Storage desde el navegador.
+      //    Esto evita el límite de 4.5MB que tiene Vercel para el cuerpo
+      //    de las peticiones a funciones de servidor.
+      setStage("uploading");
+      const { error: uploadError } = await supabaseBrowser.storage
+        .from(BUCKET)
+        .upload(path, file, { upsert: false });
+
+      if (uploadError) {
+        setResult({ error: `No se pudo subir el archivo a Storage: ${uploadError.message}` });
+        return;
+      }
+
+      // 2) Avisarle al servidor que procese ese archivo (mandamos solo la
+      //    ruta, un mensaje muy chico, no el archivo completo).
+      setStage("processing");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, tipo, filename: file.name }),
+      });
       const data = await res.json();
       setResult(data);
       if (data.ok) setFile(null);
@@ -35,6 +65,7 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
       setResult({ error: "No se pudo subir el archivo. Intenta de nuevo." });
     } finally {
       setLoading(false);
+      setStage("idle");
     }
   }
 
@@ -77,7 +108,9 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
         disabled={!file || loading}
         className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {loading ? "Procesando…" : "Cargar archivo"}
+        {stage === "uploading" && "Subiendo archivo…"}
+        {stage === "processing" && "Procesando filas…"}
+        {stage === "idle" && (loading ? "Procesando…" : "Cargar archivo")}
       </button>
 
       {result?.ok && (
