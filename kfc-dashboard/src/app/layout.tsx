@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
-      <body className={inter.variable}>
+    <html lang="es" className={inter.variable}>
+      <body>
         <div className="flex h-screen w-full overflow-hidden">
           <Sidebar />
           <main className="flex-1 overflow-y-auto">{children}</main>
