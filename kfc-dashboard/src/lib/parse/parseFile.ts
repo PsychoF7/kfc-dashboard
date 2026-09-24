@@ -93,6 +93,14 @@ function parseNumberValue(value: unknown): number | null {
   return isNaN(num) ? null : num;
 }
 
+// Postgres no permite el byte nulo (\u0000) dentro de columnas text/jsonb
+// — algunos exports grandes lo dejan colado en algún campo de texto
+// libre y hace que TODO el lote falle. Lo quitamos junto con otros
+// caracteres de control invisibles que tampoco deberían estar ahí.
+function sanitizeText(value: string): string {
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+}
+
 /** Construye un mapa header-normalizado -> índice de columna, para poder
  * localizar cada campo sin importar el orden en que venga el archivo. */
 function buildHeaderIndex(headers: string[]): Map<string, number> {
@@ -145,7 +153,8 @@ export function mapRows(
             values[col.key] = parseDateValue(cell);
             break;
           default:
-            values[col.key] = cell === null || cell === undefined ? null : String(cell).trim();
+            values[col.key] =
+              cell === null || cell === undefined ? null : sanitizeText(String(cell).trim());
         }
       }
       if (typeof values.restaurant === "string") {
@@ -154,7 +163,9 @@ export function mapRows(
 
       const raw: Record<string, unknown> = {};
       headers.forEach((h, i) => {
-        if (h) raw[h] = row[i] ?? null;
+        if (!h) return;
+        const cellVal = row[i];
+        raw[h] = typeof cellVal === "string" ? sanitizeText(cellVal) : cellVal ?? null;
       });
 
       return { values, raw };
