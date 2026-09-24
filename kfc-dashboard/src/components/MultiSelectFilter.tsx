@@ -79,15 +79,27 @@ export default function MultiSelectFilter({ label, items, selected, onChange }: 
               />
             </div>
             <div className="max-h-56 overflow-y-auto p-1">
-              {selected.length > 0 && (
+              <div className="mb-1 flex gap-1">
                 <button
                   type="button"
-                  onClick={() => onChange([])}
-                  className="mb-1 w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-brand-600 hover:bg-brand-50"
+                  onClick={() => {
+                    const merged = new Set([...selected, ...filteredItems]);
+                    onChange(Array.from(merged));
+                  }}
+                  className="flex-1 rounded-md px-2 py-1.5 text-left text-xs font-medium text-brand-600 hover:bg-brand-50"
                 >
-                  Limpiar selección ({selected.length})
+                  {search ? `Seleccionar los ${filteredItems.length} filtrados` : "Seleccionar todas"}
                 </button>
-              )}
+                {selected.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onChange([])}
+                    className="flex-1 rounded-md px-2 py-1.5 text-left text-xs font-medium text-ink-500 hover:bg-ink-50"
+                  >
+                    Limpiar ({selected.length})
+                  </button>
+                )}
+              </div>
               {filteredItems.length === 0 && (
                 <p className="px-2 py-2 text-xs text-ink-500">Sin resultados</p>
               )}
