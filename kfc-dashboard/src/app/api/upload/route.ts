@@ -6,9 +6,10 @@ import { findMissingRequiredColumns, mapRows, readSpreadsheet } from "@/lib/pars
 // xlsx necesita el runtime de Node (no Edge), y los archivos semanales
 // pueden tardar unos segundos en insertarse.
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const BATCH_SIZE = 500;
+const BUCKET = "raw-uploads";
 
 const TIPO_CONFIG = {
   ops: { table: "ops_orders", columns: OPS_COLUMNS, required: ["order_id", "estatus_orden"] },
@@ -17,16 +18,23 @@ const TIPO_CONFIG = {
 
 type Tipo = keyof typeof TIPO_CONFIG;
 
+// El cliente ya subió el archivo directo a Supabase Storage (así evitamos
+// el límite de 4.5MB por petición que tiene Vercel). Aquí solo recibimos
+// la ruta del archivo dentro del bucket y lo procesamos desde ahí.
 export async function POST(req: Request) {
-  try {
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const tipo = formData.get("tipo") as Tipo | null;
+  const supabase = getSupabaseAdmin();
 
-    if (!file) {
-      return NextResponse.json({ error: "No se recibió ningún archivo." }, { status: 400 });
+  try {
+    const body = await req.json();
+    const { path, tipo, filename } = body as { path: string; tipo: Tipo; filename: string };
+
+    if (!path || !tipo || !filename) {
+      return NextResponse.json(
+        { error: "Falta la ruta del archivo, el tipo o el nombre." },
+        { status: 400 }
+      );
     }
-    if (!tipo || !TIPO_CONFIG[tipo]) {
+    if (!TIPO_CONFIG[tipo]) {
       return NextResponse.json(
         { error: "Tipo de data inválido. Debe ser 'ops' o 'ventas'." },
         { status: 400 }
@@ -34,10 +42,18 @@ export async function POST(req: Request) {
     }
 
     const config = TIPO_CONFIG[tipo];
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
 
-    const { headers, rows } = readSpreadsheet(buffer, file.name);
+    // Descargar el archivo desde Storage (esto SÍ puede manejar archivos
+    // grandes, porque no pasa por el límite de payload de la función).
+    const { data: fileBlob, error: downloadError } = await supabase.storage
+      .from(BUCKET)
+      .download(path);
+    if (downloadError || !fileBlob) {
+      throw new Error(`No se pudo leer el archivo subido: ${downloadError?.message}`);
+    }
+    const buffer = Buffer.from(await fileBlob.arrayBuffer());
+
+    const { headers, rows } = readSpreadsheet(buffer, filename);
 
     if (headers.length === 0) {
       return NextResponse.json(
@@ -61,8 +77,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El archivo no tiene filas de datos." }, { status: 400 });
     }
 
-    const supabase = getSupabaseAdmin();
-
     // 1) Registrar la carga en el histórico de uploads
     const dates = mapped
       .map((r) => r.values.creada_en as string | null)
@@ -75,7 +89,7 @@ export async function POST(req: Request) {
       .from("uploads")
       .insert({
         tipo,
-        filename: file.name,
+        filename,
         row_count: mapped.length,
         date_range_start: dateStart,
         date_range_end: dateEnd,
@@ -102,10 +116,14 @@ export async function POST(req: Request) {
       inserted += batch.length;
     }
 
+    // 3) Ya que se guardó todo en la base, borramos el archivo temporal
+    //    de Storage (cada fila ya quedó respaldada en la columna "raw").
+    await supabase.storage.from(BUCKET).remove([path]);
+
     return NextResponse.json({
       ok: true,
       tipo,
-      filename: file.name,
+      filename,
       rows_processed: inserted,
       date_range: dateStart && dateEnd ? `${dateStart} → ${dateEnd}` : null,
       upload_id: uploadRow.id,
@@ -113,6 +131,7 @@ export async function POST(req: Request) {
   } catch (err: unknown) {
     console.error("Error en /api/upload:", err);
     const message = err instanceof Error ? err.message : "Error desconocido";
+    // Dejamos el archivo en Storage si algo falló, para poder revisarlo.
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
