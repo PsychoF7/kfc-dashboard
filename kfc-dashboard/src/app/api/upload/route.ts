@@ -149,6 +149,15 @@ export async function POST(req: Request) {
       console.warn("No se pudo borrar el archivo temporal de Storage:", cleanupErr);
     }
 
+    // 4) Actualizamos las estadísticas de la tabla para que las consultas
+    //    sigan siendo rápidas después de una carga grande (si no, Postgres
+    //    puede elegir un plan lento y algunas pantallas tardan o truenan).
+    try {
+      await supabase.rpc("analyze_table", { p_table: config.table });
+    } catch (analyzeErr) {
+      console.warn("No se pudo actualizar estadísticas de la tabla:", analyzeErr);
+    }
+
     return NextResponse.json({
       ok: true,
       tipo,
