@@ -1,53 +1,17 @@
 "use client";
 
 import { DashboardFilters, FilterOptions } from "@/lib/types";
-import PriceRangeSlider from "./PriceRangeSlider";
+import MultiSelectFilter from "./MultiSelectFilter";
+import PriceRangeInput from "./PriceRangeInput";
 
 interface FiltersBarProps {
   options: FilterOptions | null;
   filters: DashboardFilters;
   onChange: (filters: DashboardFilters) => void;
   onClear: () => void;
-  priceBounds: [number, number];
 }
 
-function Select({
-  label,
-  value,
-  items,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  items: string[];
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-ink-500">{label}</label>
-      <select
-        className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Todas</option>
-        {items.map((item) => (
-          <option key={item} value={item}>
-            {item}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-export default function FiltersBar({
-  options,
-  filters,
-  onChange,
-  onClear,
-  priceBounds,
-}: FiltersBarProps) {
+export default function FiltersBar({ options, filters, onChange, onClear }: FiltersBarProps) {
   const set = <K extends keyof DashboardFilters>(key: K, value: DashboardFilters[K]) =>
     onChange({ ...filters, [key]: value });
 
@@ -83,34 +47,34 @@ export default function FiltersBar({
           />
         </div>
 
-        <Select
+        <MultiSelectFilter
           label="Ciudad"
-          value={filters.ciudad}
           items={options?.ciudades ?? []}
+          selected={filters.ciudad}
           onChange={(v) => set("ciudad", v)}
         />
-        <Select
+        <MultiSelectFilter
           label="Restaurant"
-          value={filters.restaurant}
           items={options?.restaurantes ?? []}
+          selected={filters.restaurant}
           onChange={(v) => set("restaurant", v)}
         />
-        <Select
+        <MultiSelectFilter
           label="Zona"
-          value={filters.zona}
           items={options?.zonas ?? []}
+          selected={filters.zona}
           onChange={(v) => set("zona", v)}
         />
-        <Select
+        <MultiSelectFilter
           label="Estatus de orden"
-          value={filters.estatus}
           items={options?.estatus ?? []}
+          selected={filters.estatus}
           onChange={(v) => set("estatus", v)}
         />
-        <Select
+        <MultiSelectFilter
           label="Repartido por"
-          value={filters.repartido_por}
           items={options?.repartidores ?? []}
+          selected={filters.repartido_por}
           onChange={(v) => set("repartido_por", v)}
         />
 
@@ -127,13 +91,12 @@ export default function FiltersBar({
           </select>
         </div>
 
-        <div className="col-span-2 flex flex-col gap-1 md:col-span-2 lg:col-span-2">
+        <div className="col-span-2 flex flex-col gap-1">
           <label className="text-xs font-medium text-ink-500">Rango de precio</label>
-          <PriceRangeSlider
-            min={priceBounds[0]}
-            max={priceBounds[1]}
-            value={[filters.price_min, filters.price_max]}
-            onChange={([lo, hi]) => onChange({ ...filters, price_min: lo, price_max: hi })}
+          <PriceRangeInput
+            min={filters.price_min}
+            max={filters.price_max}
+            onChange={(lo, hi) => onChange({ ...filters, price_min: lo, price_max: hi })}
           />
         </div>
       </div>
