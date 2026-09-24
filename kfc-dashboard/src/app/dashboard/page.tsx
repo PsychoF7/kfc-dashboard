@@ -30,7 +30,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/filters")
+    fetch("/api/filters", { cache: "no-store" })
       .then((r) => r.json())
       .then(setOptions)
       .catch(() => setError("No se pudieron cargar las opciones de filtro."));
@@ -55,7 +55,7 @@ export default function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/kpis?${queryString}`)
+    fetch(`/api/kpis?${queryString}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (data?.error) throw new Error(data.error);
