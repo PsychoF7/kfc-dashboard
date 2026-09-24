@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { withRetryResult } from "@/lib/supabase/retry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,10 +18,12 @@ export async function GET(req: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.rpc("get_payment_breakdown", {
-    p_week_start: weekStart,
-    p_week_end: weekEnd,
-  });
+  const { data, error } = await withRetryResult(() =>
+    supabase.rpc("get_payment_breakdown", {
+      p_week_start: weekStart,
+      p_week_end: weekEnd,
+    })
+  );
 
   if (error) {
     console.error("Error en /api/pagos/desglose:", error);
