@@ -194,9 +194,9 @@ export default function PagosPage() {
     .slice(0, TOP_N);
 
   const filaDelivery = filas?.find((f) => f.categoria === "delivery");
-  const defaultSubject = week ? `Pago Semana ${week.label} KFC` : "";
+  const defaultSubject = week ? `Pago Semana ${week.weekNumber} KFC` : "";
   const defaultBody = week
-    ? `Buen día Mariela.\n\nMe podrías apoyar, por favor, con la generación del pago correspondiente a la semana del ${week.label} de KFC; el monto a considerar es de ${money(
+    ? `Buen día Mariela.\n\nMe podrías apoyar, por favor, con la generación del pago correspondiente a la Semana ${week.weekNumber} de KFC; el monto a considerar es de ${money(
         filaDelivery?.efectivo_depositar
       )}\n\nTe agradezco mucho el apoyo.\nSaludos.`
     : "";
@@ -222,7 +222,7 @@ export default function PagosPage() {
           onChange={(e) => setAnchorDate(e.target.value)}
           className="mt-1 block rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
-        {week && <p className="mt-2 text-sm text-ink-700">Semana: {week.label}</p>}
+        {week && <p className="mt-2 text-sm text-ink-700">{week.fullLabel}</p>}
       </div>
 
       {error && (
@@ -505,7 +505,7 @@ export default function PagosPage() {
               <option value="">Todas las semanas</option>
               {semanasDisponibles.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {getWeekRange(s).fullLabel}
                 </option>
               ))}
             </select>
@@ -531,9 +531,7 @@ export default function PagosPage() {
               <tbody>
                 {historico.map((h) => (
                   <tr key={h.id} className="border-b border-ink-100 last:border-0">
-                    <td className="py-2 pr-4 text-ink-700">
-                      {h.semana_inicio} → {h.semana_fin}
-                    </td>
+                    <td className="py-2 pr-4 text-ink-700">{getWeekRange(h.semana_inicio).fullLabel}</td>
                     <td className="py-2 pr-4 font-medium text-ink-900">
                       {CATEGORIA_LABEL[h.categoria] ?? h.categoria}
                     </td>
