@@ -96,8 +96,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El archivo no tiene filas de datos." }, { status: 400 });
     }
 
+    // Si el mismo orderId aparece varias veces en el archivo (p.ej. una
+    // orden que cambió de estatus y se exportó de nuevo), nos quedamos
+    // solo con la última aparición — si no, el upsert intenta actualizar
+    // la misma fila dos veces en un solo lote y Postgres lo rechaza.
+    const dedupedMap = new Map<string, (typeof mapped)[number]>();
+    for (const row of mapped) {
+      const orderId = row.values.order_id as string | null;
+      if (orderId) dedupedMap.set(orderId, row);
+    }
+    const deduped = Array.from(dedupedMap.values());
+    const duplicadosEncontrados = mapped.length - deduped.length;
+
     // 1) Registrar la carga en el histórico de uploads
-    const dates = mapped
+    const dates = deduped
       .map((r) => r.values.creada_en as string | null)
       .filter((d): d is string => Boolean(d))
       .sort();
@@ -110,7 +122,7 @@ export async function POST(req: Request) {
         .insert({
           tipo,
           filename,
-          row_count: mapped.length,
+          row_count: deduped.length,
           date_range_start: dateStart,
           date_range_end: dateEnd,
         })
@@ -124,8 +136,8 @@ export async function POST(req: Request) {
     //    upsert por order_id: si una orden ya existía (semanas que se
     //    traslapan) se actualiza en vez de duplicarse.
     let inserted = 0;
-    for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
-      const batch = mapped.slice(i, i + BATCH_SIZE).map((r) => ({
+    for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+      const batch = deduped.slice(i, i + BATCH_SIZE).map((r) => ({
         ...r.values,
         raw: r.raw,
         upload_batch_id: uploadRow.id,
@@ -163,6 +175,7 @@ export async function POST(req: Request) {
       tipo,
       filename,
       rows_processed: inserted,
+      duplicados_en_archivo: duplicadosEncontrados,
       date_range: dateStart && dateEnd ? `${dateStart} → ${dateEnd}` : null,
       upload_id: uploadRow.id,
     });
