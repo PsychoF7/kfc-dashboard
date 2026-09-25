@@ -34,32 +34,23 @@ export async function POST(req: Request) {
     const row = weekNumber + 2;
     const sheets = getSheetsClient();
 
-    await sheets.spreadsheets.values.batchUpdate({
+    // Solo tocamos C:F — Monto Efectivo, #Efectivo, #Tarjeta, Envíos
+    // Efectivo. El resto de las columnas (Envíos Tarjeta, Total Envío,
+    // Efectivo Depositar, Depósito Envíos Tarjeta) tienen fórmulas en tu
+    // hoja y se recalculan solas — si las escribimos, les borraríamos la
+    // fórmula.
+    await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
+      range: `'${SHEET_NAME}'!C${row}:F${row}`,
+      valueInputOption: "USER_ENTERED",
       requestBody: {
-        valueInputOption: "USER_ENTERED",
-        data: [
-          {
-            // C a I: Monto Efectivo, #Efectivo, #Tarjeta, Envíos Efectivo,
-            // Envíos Tarjeta, Total Envío, Efectivo Depositar
-            range: `'${SHEET_NAME}'!C${row}:I${row}`,
-            values: [
-              [
-                general.monto_efectivo,
-                general.n_efectivo,
-                general.n_tarjeta,
-                general.envios_efectivo,
-                general.envios_tarjeta,
-                general.total_envio,
-                general.efectivo_depositar,
-              ],
-            ],
-          },
-          {
-            // N: Deposito Envios tarjeta
-            range: `'${SHEET_NAME}'!N${row}`,
-            values: [[general.deposito_envios_tarjeta]],
-          },
+        values: [
+          [
+            general.monto_efectivo,
+            general.n_efectivo,
+            general.n_tarjeta,
+            general.envios_efectivo,
+          ],
         ],
       },
     });
