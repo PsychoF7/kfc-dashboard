@@ -80,6 +80,11 @@ export default function PagosPage() {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
+  const [actualizandoHoja, setActualizandoHoja] = useState(false);
+  const [confirmandoHoja, setConfirmandoHoja] = useState(false);
+  const [hojaResultado, setHojaResultado] = useState<{ ok?: boolean; error?: string } | null>(
+    null
+  );
 
   const [historico, setHistorico] = useState<HistoricoFila[] | null>(null);
   const [filtroSemana, setFiltroSemana] = useState("");
@@ -171,6 +176,30 @@ export default function PagosPage() {
     }
   }
 
+  async function actualizarHoja() {
+    const filaGeneral = filas?.find((f) => f.categoria === "general");
+    if (!week || !filaGeneral) return;
+    setActualizandoHoja(true);
+    setHojaResultado(null);
+    try {
+      const res = await fetch("/api/pagos/actualizar-hoja", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekNumber: week.weekNumber, general: filaGeneral }),
+      });
+      const data = await res.json();
+      if (data?.error) throw new Error(data.error);
+      setHojaResultado({ ok: true });
+    } catch (e) {
+      setHojaResultado({
+        error: e instanceof Error ? e.message : "No se pudo actualizar la hoja.",
+      });
+    } finally {
+      setActualizandoHoja(false);
+      setConfirmandoHoja(false);
+    }
+  }
+
   const totalVentas = dias?.reduce((s, d) => s + d.en_ventas, 0) ?? 0;
   const totalOps = dias?.reduce((s, d) => s + d.en_operaciones, 0) ?? 0;
   const diferenciaTotal = Math.abs(totalVentas - totalOps);
@@ -194,6 +223,7 @@ export default function PagosPage() {
     .slice(0, TOP_N);
 
   const filaDelivery = filas?.find((f) => f.categoria === "delivery");
+  const filaGeneral = filas?.find((f) => f.categoria === "general");
   const defaultSubject = week ? `Pago Semana ${week.weekNumber} KFC` : "";
   const defaultBody = week
     ? `Buen día Mariela.\n\nMe podrías apoyar, por favor, con la generación del pago correspondiente a la Semana ${week.weekNumber} de KFC; el monto a considerar es de ${money(
@@ -316,12 +346,107 @@ export default function PagosPage() {
               >
                 Enviar correo
               </button>
+              <button
+                onClick={() => setConfirmandoHoja(true)}
+                disabled={actualizandoHoja}
+                className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50 disabled:opacity-50"
+              >
+                Actualizar hoja de Google
+              </button>
             </div>
           </div>
           {guardadoOk && (
             <p className="mt-2 text-xs font-medium text-success">
               ✓ Semana guardada en el histórico.
             </p>
+          )}
+          {hojaResultado?.ok && (
+            <p className="mt-2 text-xs font-medium text-success">
+              ✓ Hoja de Google actualizada (Semana {week?.weekNumber}).
+            </p>
+          )}
+          {hojaResultado?.error && (
+            <p className="mt-2 text-xs font-medium text-danger">{hojaResultado.error}</p>
+          )}
+
+          {confirmandoHoja && week && filaGeneral && (
+            <div className="mt-4 rounded-lg border border-brand-500 bg-brand-50 p-4">
+              <p className="text-sm font-semibold text-ink-900">
+                Vas a escribir en la fila {week.weekNumber + 2} (Semana {week.weekNumber}) de la
+                pestaña "Relacion Semanal 2026":
+              </p>
+              <table className="mt-3 w-full text-xs">
+                <tbody>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna C — Monto Efectivo</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {money(filaGeneral.monto_efectivo)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna D — # Efectivo</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {int(filaGeneral.n_efectivo)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna E — # Tarjeta</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {int(filaGeneral.n_tarjeta)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna F — Envíos Efectivo</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {money(filaGeneral.envios_efectivo)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna G — Envíos Tarjeta</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {money(filaGeneral.envios_tarjeta)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna H — Total Envío</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {money(filaGeneral.total_envio)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-brand-100">
+                    <td className="py-1 pr-3 text-ink-500">Columna I — Efectivo Depositar</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {money(filaGeneral.efectivo_depositar)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 pr-3 text-ink-500">Columna N — Depósito Envíos Tarjeta</td>
+                    <td className="py-1 text-right font-medium text-ink-900">
+                      {money(filaGeneral.deposito_envios_tarjeta)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-3 text-xs text-ink-500">
+                No se toca ninguna otra fila, ninguna otra pestaña, ni las columnas de fecha (esas
+                las llenas tú a mano).
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmandoHoja(false)}
+                  className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={actualizarHoja}
+                  disabled={actualizandoHoja}
+                  className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {actualizandoHoja ? "Actualizando…" : "Sí, actualizar la hoja"}
+                </button>
+              </div>
+            </div>
           )}
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
