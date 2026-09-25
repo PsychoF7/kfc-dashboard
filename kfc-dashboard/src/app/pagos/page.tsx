@@ -41,6 +41,12 @@ interface HistoricoFila {
   estado: string;
 }
 
+interface TiendaInactiva {
+  restaurant: string;
+  ultima_orden: string | null;
+  dias_sin_operar: number | null;
+}
+
 const CATEGORIA_LABEL: Record<string, string> = {
   general: "General",
   delivery: "Delivery",
@@ -49,6 +55,7 @@ const CATEGORIA_LABEL: Record<string, string> = {
 
 const UMBRAL_DIFERENCIA = 5;
 const TOP_N = 5;
+const UMBRAL_DIAS_INACTIVA = 10;
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
@@ -66,6 +73,7 @@ export default function PagosPage() {
   const [dias, setDias] = useState<DiaComparativa[] | null>(null);
   const [filas, setFilas] = useState<FilaDesglose[] | null>(null);
   const [tiendas, setTiendas] = useState<TiendaTrend[] | null>(null);
+  const [inactivas, setInactivas] = useState<TiendaInactiva[] | null>(null);
   const [notas, setNotas] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,17 +101,22 @@ export default function PagosPage() {
       fetch(`/api/pagos/tendencia?week_start=${week.start}&week_end=${week.end}`, {
         cache: "no-store",
       }).then((r) => r.json()),
+      fetch(`/api/pagos/inactividad?as_of=${week.end}`, { cache: "no-store" }).then((r) =>
+        r.json()
+      ),
       fetch(`/api/pagos/notas?week_start=${week.start}`, { cache: "no-store" }).then((r) =>
         r.json()
       ),
     ])
-      .then(([comparativa, desglose, tendencia, notasRes]) => {
+      .then(([comparativa, desglose, tendencia, inactividad, notasRes]) => {
         if (comparativa?.error) throw new Error(comparativa.error);
         if (desglose?.error) throw new Error(desglose.error);
         if (tendencia?.error) throw new Error(tendencia.error);
+        if (inactividad?.error) throw new Error(inactividad.error);
         setDias(comparativa.dias);
         setFilas(desglose.filas);
         setTiendas(tendencia.tiendas);
+        setInactivas(inactividad.tiendas);
         const notasMap: Record<string, string> = {};
         (notasRes.notas ?? []).forEach((n: { restaurant: string; nota: string | null }) => {
           notasMap[n.restaurant] = n.nota ?? "";
@@ -166,6 +179,9 @@ export default function PagosPage() {
   const pctCambioTotal =
     totalAnterior > 0 ? ((totalActual - totalAnterior) / totalAnterior) * 100 : null;
   const tiendasDetenidas = tiendas?.filter((t) => t.dejo_de_operar) ?? [];
+  const tiendasSinOperacion = (inactivas ?? [])
+    .filter((t) => (t.dias_sin_operar ?? 0) >= UMBRAL_DIAS_INACTIVA)
+    .sort((a, b) => (b.dias_sin_operar ?? 0) - (a.dias_sin_operar ?? 0));
   const tiendasSubieron = (tiendas ?? [])
     .filter((t) => !t.dejo_de_operar && t.diferencia > 0)
     .sort((a, b) => b.diferencia - a.diferencia)
@@ -317,6 +333,41 @@ export default function PagosPage() {
                     <td className="py-2 pr-4 text-right text-ink-700">{money(f.total_envio)}</td>
                     <td className="py-2 pr-4 text-right font-semibold text-ink-900">
                       {money(f.efectivo_depositar)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {week && !loading && tiendasSinOperacion.length > 0 && (
+        <div className="mt-6 rounded-xl border border-danger bg-danger-bg p-5 shadow-card">
+          <h2 className="text-sm font-semibold text-danger">
+            ⚠ Tiendas sin operación reciente (10+ días)
+          </h2>
+          <p className="mt-1 text-xs text-ink-700">
+            Estas tiendas no tienen ni una sola orden desde hace tiempo — se detectan aunque haya
+            pasado más de una semana desde que dejaron de operar, así no se pierden entre
+            revisiones.
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-danger/30 text-left text-xs text-ink-600">
+                  <th className="py-2 pr-4">Tienda</th>
+                  <th className="py-2 pr-4">Última orden</th>
+                  <th className="py-2 pr-4 text-right">Días sin operar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tiendasSinOperacion.map((t) => (
+                  <tr key={t.restaurant} className="border-b border-danger/20 last:border-0">
+                    <td className="py-2 pr-4 text-ink-900">{t.restaurant}</td>
+                    <td className="py-2 pr-4 text-ink-700">{t.ultima_orden ?? "Nunca"}</td>
+                    <td className="py-2 pr-4 text-right font-semibold text-danger">
+                      {t.dias_sin_operar ?? "—"}
                     </td>
                   </tr>
                 ))}
