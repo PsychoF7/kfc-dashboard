@@ -37,8 +37,13 @@ interface HistoricoFila {
   semana_inicio: string;
   semana_fin: string;
   categoria: string;
-  efectivo_depositar: number;
+  monto_efectivo: number;
+  n_efectivo: number;
+  n_tarjeta: number;
+  envios_efectivo: number;
+  envios_tarjeta: number;
   total_envio: number;
+  efectivo_depositar: number;
   estado: string;
 }
 
@@ -53,6 +58,8 @@ const CATEGORIA_LABEL: Record<string, string> = {
   delivery: "Delivery",
   flotilla: "Mi Flotilla",
 };
+
+const CATEGORIA_ORDEN: Record<string, number> = { general: 0, delivery: 1, flotilla: 2 };
 
 const UMBRAL_DIFERENCIA = 5;
 const TOP_N = 5;
@@ -140,7 +147,16 @@ export default function PagosPage() {
       : "/api/pagos/historico";
     fetch(url, { cache: "no-store" })
       .then((r) => r.json())
-      .then((res) => setHistorico(res.filas ?? []))
+      .then((res) => {
+        const filas: HistoricoFila[] = res.filas ?? [];
+        filas.sort((a, b) => {
+          if (a.semana_inicio !== b.semana_inicio) {
+            return b.semana_inicio.localeCompare(a.semana_inicio);
+          }
+          return (CATEGORIA_ORDEN[a.categoria] ?? 9) - (CATEGORIA_ORDEN[b.categoria] ?? 9);
+        });
+        setHistorico(filas);
+      })
       .catch(() => setHistorico([]));
   }, [filtroSemana, guardadoOk]);
 
@@ -395,41 +411,18 @@ export default function PagosPage() {
                       {int(filaGeneral.n_tarjeta)}
                     </td>
                   </tr>
-                  <tr className="border-b border-brand-100">
+                  <tr>
                     <td className="py-1 pr-3 text-ink-500">Columna F — Envíos Efectivo</td>
                     <td className="py-1 text-right font-medium text-ink-900">
                       {money(filaGeneral.envios_efectivo)}
                     </td>
                   </tr>
-                  <tr className="border-b border-brand-100">
-                    <td className="py-1 pr-3 text-ink-500">Columna G — Envíos Tarjeta</td>
-                    <td className="py-1 text-right font-medium text-ink-900">
-                      {money(filaGeneral.envios_tarjeta)}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-brand-100">
-                    <td className="py-1 pr-3 text-ink-500">Columna H — Total Envío</td>
-                    <td className="py-1 text-right font-medium text-ink-900">
-                      {money(filaGeneral.total_envio)}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-brand-100">
-                    <td className="py-1 pr-3 text-ink-500">Columna I — Efectivo Depositar</td>
-                    <td className="py-1 text-right font-medium text-ink-900">
-                      {money(filaGeneral.efectivo_depositar)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-1 pr-3 text-ink-500">Columna N — Depósito Envíos Tarjeta</td>
-                    <td className="py-1 text-right font-medium text-ink-900">
-                      {money(filaGeneral.deposito_envios_tarjeta)}
-                    </td>
-                  </tr>
                 </tbody>
               </table>
               <p className="mt-3 text-xs text-ink-500">
-                No se toca ninguna otra fila, ninguna otra pestaña, ni las columnas de fecha (esas
-                las llenas tú a mano).
+                Las demás columnas (Envíos Tarjeta, Total Envío, Efectivo Depositar, etc.) tienen
+                fórmulas en tu hoja y se recalculan solas — no las tocamos. Tampoco se toca
+                ninguna otra fila, ninguna otra pestaña, ni las columnas de fecha.
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -648,25 +641,44 @@ export default function PagosPage() {
                 <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
                   <th className="py-2 pr-4">Semana</th>
                   <th className="py-2 pr-4">Desglose</th>
+                  <th className="py-2 pr-4 text-right">Monto efectivo</th>
+                  <th className="py-2 pr-4 text-right"># Efectivo</th>
+                  <th className="py-2 pr-4 text-right"># Tarjeta</th>
+                  <th className="py-2 pr-4 text-right">Envíos efectivo</th>
+                  <th className="py-2 pr-4 text-right">Envíos tarjeta</th>
                   <th className="py-2 pr-4 text-right">Total envío</th>
                   <th className="py-2 pr-4 text-right">Efectivo a depositar</th>
-                  <th className="py-2 pr-4">Estado</th>
                 </tr>
               </thead>
               <tbody>
-                {historico.map((h) => (
-                  <tr key={h.id} className="border-b border-ink-100 last:border-0">
-                    <td className="py-2 pr-4 text-ink-700">{getWeekRange(h.semana_inicio).fullLabel}</td>
-                    <td className="py-2 pr-4 font-medium text-ink-900">
-                      {CATEGORIA_LABEL[h.categoria] ?? h.categoria}
-                    </td>
-                    <td className="py-2 pr-4 text-right text-ink-700">{money(h.total_envio)}</td>
-                    <td className="py-2 pr-4 text-right font-semibold text-ink-900">
-                      {money(h.efectivo_depositar)}
-                    </td>
-                    <td className="py-2 pr-4 text-xs text-ink-500">{h.estado}</td>
-                  </tr>
-                ))}
+                {historico.map((h, i) => {
+                  const nuevaSemana = i === 0 || historico[i - 1].semana_inicio !== h.semana_inicio;
+                  return (
+                    <tr key={h.id} className="border-b border-ink-100 last:border-0">
+                      <td className="py-2 pr-4 text-ink-700">
+                        {nuevaSemana ? getWeekRange(h.semana_inicio).fullLabel : ""}
+                      </td>
+                      <td className="py-2 pr-4 font-medium text-ink-900">
+                        {CATEGORIA_LABEL[h.categoria] ?? h.categoria}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-ink-700">
+                        {money(h.monto_efectivo)}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-ink-700">{int(h.n_efectivo)}</td>
+                      <td className="py-2 pr-4 text-right text-ink-700">{int(h.n_tarjeta)}</td>
+                      <td className="py-2 pr-4 text-right text-ink-700">
+                        {money(h.envios_efectivo)}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-ink-700">
+                        {money(h.envios_tarjeta)}
+                      </td>
+                      <td className="py-2 pr-4 text-right text-ink-700">{money(h.total_envio)}</td>
+                      <td className="py-2 pr-4 text-right font-semibold text-ink-900">
+                        {money(h.efectivo_depositar)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
