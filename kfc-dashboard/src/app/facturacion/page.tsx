@@ -270,3 +270,9 @@ export default function FacturacionPage() {
                 </table>
               </div>
             )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
