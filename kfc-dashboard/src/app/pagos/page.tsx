@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getWeekRange } from "@/lib/week";
+import EmailComposer from "@/components/EmailComposer";
 
 interface DiaComparativa {
   dia: string;
@@ -82,6 +83,7 @@ export default function PagosPage() {
 
   const [historico, setHistorico] = useState<HistoricoFila[] | null>(null);
   const [filtroSemana, setFiltroSemana] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const week = useMemo(() => (anchorDate ? getWeekRange(anchorDate) : null), [anchorDate]);
 
@@ -191,6 +193,14 @@ export default function PagosPage() {
     .sort((a, b) => a.diferencia - b.diferencia)
     .slice(0, TOP_N);
 
+  const filaDelivery = filas?.find((f) => f.categoria === "delivery");
+  const defaultSubject = week ? `Pago Semana ${week.label} KFC` : "";
+  const defaultBody = week
+    ? `Buen día Mariela.\n\nMe podrías apoyar, por favor, con la generación del pago correspondiente a la semana del ${week.label} de KFC; el monto a considerar es de ${money(
+        filaDelivery?.efectivo_depositar
+      )}\n\nTe agradezco mucho el apoyo.\nSaludos.`
+    : "";
+
   const semanasDisponibles = Array.from(
     new Set((historico ?? []).map((h) => h.semana_inicio))
   ).sort((a, b) => b.localeCompare(a));
@@ -292,13 +302,21 @@ export default function PagosPage() {
         <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-ink-900">Desglose de la semana</h2>
-            <button
-              onClick={guardarHistorico}
-              disabled={guardando}
-              className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
-            >
-              {guardando ? "Guardando…" : "Guardar en histórico"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={guardarHistorico}
+                disabled={guardando}
+                className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+              >
+                {guardando ? "Guardando…" : "Guardar en histórico"}
+              </button>
+              <button
+                onClick={() => setComposerOpen(true)}
+                className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50"
+              >
+                Enviar correo
+              </button>
+            </div>
           </div>
           {guardadoOk && (
             <p className="mt-2 text-xs font-medium text-success">
@@ -531,6 +549,14 @@ export default function PagosPage() {
           </div>
         )}
       </div>
+
+      <EmailComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        defaultTo="mariela.miranda@ambit.la"
+        defaultSubject={defaultSubject}
+        defaultBody={defaultBody}
+      />
     </div>
   );
 }
