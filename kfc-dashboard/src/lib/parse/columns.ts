@@ -20,7 +20,6 @@ export interface ColumnDef {
 
 // -----------------------------------------------------------------------
 // Data de OPERACIONES (ops) — columnas que usamos como campos propios.
-// Todo lo demás del archivo se guarda igual, íntegro, en la columna "raw".
 // -----------------------------------------------------------------------
 export const OPS_COLUMNS: ColumnDef[] = [
   { key: "order_id", aliases: ["orderId", "ID de orden", "order_id"], type: "text" },
@@ -61,6 +60,14 @@ export const OPS_COLUMNS: ColumnDef[] = [
     ],
     type: "number",
   },
+  { key: "tiempo_aceptacion_restaurante", aliases: ["Tiempo de aceptacion de restaurante", "Tiempo de aceptación de restaurante"], type: "number" },
+  { key: "tiempo_aceptacion_repartidor", aliases: ["Tiempo de aceptacion de repartidor", "Tiempo de aceptación de repartidor"], type: "number" },
+  { key: "tiempo_llegar_tienda", aliases: ["Tiempo para llegar a tienda"], type: "number" },
+  { key: "tiempo_recoger", aliases: ["Tiempo para recoger"], type: "number" },
+  { key: "tiempo_entregar", aliases: ["Tiempo para entregar"], type: "number" },
+  { key: "tiempo_completar", aliases: ["Tiempo para completar"], type: "number" },
+  { key: "tiempo_manejo", aliases: ["Tiempo de manejo"], type: "number" },
+  { key: "tiempo_total_envio", aliases: ["Tiempo total de envio", "Tiempo total de envío"], type: "number" },
 ];
 
 // -----------------------------------------------------------------------
