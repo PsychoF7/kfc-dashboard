@@ -96,17 +96,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "El archivo no tiene filas de datos." }, { status: 400 });
     }
 
+    // El archivo trae TODAS las marcas de la plataforma, no solo KFC.
+    // Descartamos lo que no sea KFC desde aquí — así no se guarda ni se
+    // procesa de más (ahorra espacio en la base y tiempo de carga).
+    const soloKfc = mapped.filter((r) => {
+      const restaurant = r.values.restaurant as string | null;
+      return restaurant && /kfc/i.test(restaurant);
+    });
+    const descartadosNoKfc = mapped.length - soloKfc.length;
+
+    if (soloKfc.length === 0) {
+      return NextResponse.json(
+        { error: "El archivo no tiene ninguna fila de KFC." },
+        { status: 400 }
+      );
+    }
+
     // Si el mismo orderId aparece varias veces en el archivo (p.ej. una
     // orden que cambió de estatus y se exportó de nuevo), nos quedamos
     // solo con la última aparición — si no, el upsert intenta actualizar
     // la misma fila dos veces en un solo lote y Postgres lo rechaza.
-    const dedupedMap = new Map<string, (typeof mapped)[number]>();
-    for (const row of mapped) {
+    const dedupedMap = new Map<string, (typeof soloKfc)[number]>();
+    for (const row of soloKfc) {
       const orderId = row.values.order_id as string | null;
       if (orderId) dedupedMap.set(orderId, row);
     }
     const deduped = Array.from(dedupedMap.values());
-    const duplicadosEncontrados = mapped.length - deduped.length;
+    const duplicadosEncontrados = soloKfc.length - deduped.length;
 
     // 1) Registrar la carga en el histórico de uploads
     const dates = deduped
@@ -139,7 +155,6 @@ export async function POST(req: Request) {
     for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
       const batch = deduped.slice(i, i + BATCH_SIZE).map((r) => ({
         ...r.values,
-        raw: r.raw,
         upload_batch_id: uploadRow.id,
         updated_at: new Date().toISOString(),
       }));
@@ -152,9 +167,8 @@ export async function POST(req: Request) {
     }
 
     // 3) Ya que se guardó todo en la base, borramos el archivo temporal
-    //    de Storage (cada fila ya quedó respaldada en la columna "raw").
-    //    Si este paso falla no es grave — el archivo queda ahí sin usarse,
-    //    así que no debe tumbar una carga que sí funcionó.
+    //    de Storage. Si este paso falla no es grave — el archivo queda
+    //    ahí sin usarse, así que no debe tumbar una carga que sí funcionó.
     try {
       await withRetry(() => supabase.storage.from(BUCKET).remove([path]));
     } catch (cleanupErr) {
@@ -176,6 +190,7 @@ export async function POST(req: Request) {
       filename,
       rows_processed: inserted,
       duplicados_en_archivo: duplicadosEncontrados,
+      descartados_no_kfc: descartadosNoKfc,
       date_range: dateStart && dateEnd ? `${dateStart} → ${dateEnd}` : null,
       upload_id: uploadRow.id,
     });
