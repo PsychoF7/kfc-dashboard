@@ -118,12 +118,9 @@ function buildHeaderIndex(headers: string[]): Map<string, number> {
 
 export interface MappedRow {
   values: Record<string, unknown>;
-  raw: Record<string, unknown>;
 }
 
-/** Mapea cada fila cruda a las columnas canónicas definidas en columns.ts,
- * y conserva la fila original completa (con los encabezados tal cual
- * venían en el archivo) en "raw" para no perder ningún dato. */
+/** Mapea cada fila cruda a las columnas canónicas definidas en columns.ts. */
 export function mapRows(
   headers: string[],
   rows: unknown[][],
@@ -168,14 +165,7 @@ export function mapRows(
         values.is_flotilla = isFlotilla(values.restaurant as string);
       }
 
-      const raw: Record<string, unknown> = {};
-      headers.forEach((h, i) => {
-        if (!h) return;
-        const cellVal = row[i];
-        raw[h] = typeof cellVal === "string" ? sanitizeText(cellVal) : cellVal ?? null;
-      });
-
-      return { values, raw };
+      return { values };
     });
 }
 
