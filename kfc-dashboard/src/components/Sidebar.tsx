@@ -9,12 +9,12 @@ const AVAILABLE = [
   { href: "/upload", label: "Cargar datos" },
   { href: "/pagos", label: "Desglose de pagos" },
   { href: "/facturacion", label: "Facturación mensual" },
+  { href: "/devoluciones", label: "Devoluciones y cancelaciones" },
 ];
 
 // Estas secciones son las fases siguientes del proyecto — se muestran
 // para que el roadmap sea transparente, pero aún no están construidas.
 const ROADMAP = [
-  "Devoluciones y cancelaciones",
   "Análisis de tiempos",
   "Avisos y actualizaciones",
   "Bugs",
