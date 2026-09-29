@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { getWeekRange } from "@/lib/week";
 import EmailComposer from "@/components/EmailComposer";
 
@@ -47,6 +47,12 @@ interface HistoricoFila {
   estado: string;
 }
 
+interface SemanaHistorico {
+  semana_inicio: string;
+  general: HistoricoFila | undefined;
+  detalle: HistoricoFila[]; // Delivery y Mi Flotilla (lo que se despliega)
+}
+
 interface TiendaInactiva {
   restaurant: string;
   ultima_orden: string | null;
@@ -76,6 +82,24 @@ const diaLabel = (iso: string) =>
     month: "short",
   });
 
+/** Celdas numéricas de una fila del histórico (se reusan en la fila de semana y en el detalle). */
+function CeldasHistorico({ h, destacado }: { h: HistoricoFila; destacado?: boolean }) {
+  const base = destacado ? "text-ink-900" : "text-ink-700";
+  return (
+    <>
+      <td className={`py-2 pr-4 text-right ${base}`}>{money(h.monto_efectivo)}</td>
+      <td className={`py-2 pr-4 text-right ${base}`}>{int(h.n_efectivo)}</td>
+      <td className={`py-2 pr-4 text-right ${base}`}>{int(h.n_tarjeta)}</td>
+      <td className={`py-2 pr-4 text-right ${base}`}>{money(h.envios_efectivo)}</td>
+      <td className={`py-2 pr-4 text-right ${base}`}>{money(h.envios_tarjeta)}</td>
+      <td className={`py-2 pr-4 text-right ${base}`}>{money(h.total_envio)}</td>
+      <td className="py-2 pr-4 text-right font-semibold text-ink-900">
+        {money(h.efectivo_depositar)}
+      </td>
+    </>
+  );
+}
+
 export default function PagosPage() {
   const [anchorDate, setAnchorDate] = useState("");
   const [dias, setDias] = useState<DiaComparativa[] | null>(null);
@@ -95,6 +119,7 @@ export default function PagosPage() {
 
   const [historico, setHistorico] = useState<HistoricoFila[] | null>(null);
   const [filtroSemana, setFiltroSemana] = useState("");
+  const [semanasAbiertas, setSemanasAbiertas] = useState<Set<string>>(new Set());
   const [composerOpen, setComposerOpen] = useState(false);
 
   const week = useMemo(() => (anchorDate ? getWeekRange(anchorDate) : null), [anchorDate]);
@@ -160,6 +185,11 @@ export default function PagosPage() {
       .catch(() => setHistorico([]));
   }, [filtroSemana, guardadoOk]);
 
+  // Si filtras una sola semana, se muestra ya desplegada.
+  useEffect(() => {
+    setSemanasAbiertas(filtroSemana ? new Set([filtroSemana]) : new Set());
+  }, [filtroSemana]);
+
   async function guardarHistorico() {
     if (!week || !filas) return;
     setGuardando(true);
@@ -216,6 +246,15 @@ export default function PagosPage() {
     }
   }
 
+  function toggleSemana(s: string) {
+    setSemanasAbiertas((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  }
+
   const totalVentas = dias?.reduce((s, d) => s + d.en_ventas, 0) ?? 0;
   const totalOps = dias?.reduce((s, d) => s + d.en_operaciones, 0) ?? 0;
   const diferenciaTotal = Math.abs(totalVentas - totalOps);
@@ -250,6 +289,32 @@ export default function PagosPage() {
   const semanasDisponibles = Array.from(
     new Set((historico ?? []).map((h) => h.semana_inicio))
   ).sort((a, b) => b.localeCompare(a));
+
+  // Agrupa el histórico por semana: la fila General queda visible y
+  // Delivery / Mi Flotilla se muestran solo al desplegar.
+  const semanasHistorico: SemanaHistorico[] = useMemo(() => {
+    const mapa = new Map<string, HistoricoFila[]>();
+    (historico ?? []).forEach((h) => {
+      const lista = mapa.get(h.semana_inicio) ?? [];
+      lista.push(h);
+      mapa.set(h.semana_inicio, lista);
+    });
+    return Array.from(mapa.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([semana_inicio, lista]) => ({
+        semana_inicio,
+        general: lista.find((h) => h.categoria === "general"),
+        detalle: lista
+          .filter((h) => h.categoria !== "general")
+          .sort(
+            (a, b) => (CATEGORIA_ORDEN[a.categoria] ?? 9) - (CATEGORIA_ORDEN[b.categoria] ?? 9)
+          ),
+      }));
+  }, [historico]);
+
+  const todasAbiertas =
+    semanasHistorico.length > 0 &&
+    semanasHistorico.every((s) => semanasAbiertas.has(s.semana_inicio));
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -612,22 +677,38 @@ export default function PagosPage() {
       )}
 
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-ink-900">Histórico de semanas guardadas</h2>
-          {semanasDisponibles.length > 0 && (
-            <select
-              value={filtroSemana}
-              onChange={(e) => setFiltroSemana(e.target.value)}
-              className="rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
-            >
-              <option value="">Todas las semanas</option>
-              {semanasDisponibles.map((s) => (
-                <option key={s} value={s}>
-                  {getWeekRange(s).fullLabel}
-                </option>
-              ))}
-            </select>
-          )}
+          <div className="flex items-center gap-2">
+            {semanasHistorico.length > 1 && (
+              <button
+                onClick={() =>
+                  setSemanasAbiertas(
+                    todasAbiertas
+                      ? new Set()
+                      : new Set(semanasHistorico.map((s) => s.semana_inicio))
+                  )
+                }
+                className="rounded-lg border border-ink-200 px-2 py-1 text-xs font-medium text-ink-700 hover:bg-ink-50"
+              >
+                {todasAbiertas ? "Contraer todo" : "Desplegar todo"}
+              </button>
+            )}
+            {semanasDisponibles.length > 0 && (
+              <select
+                value={filtroSemana}
+                onChange={(e) => setFiltroSemana(e.target.value)}
+                className="rounded-lg border border-ink-200 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none"
+              >
+                <option value="">Todas las semanas</option>
+                {semanasDisponibles.map((s) => (
+                  <option key={s} value={s}>
+                    {getWeekRange(s).fullLabel}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
 
         {!historico || historico.length === 0 ? (
@@ -635,53 +716,83 @@ export default function PagosPage() {
             Todavía no has guardado ninguna semana. Usa el botón "Guardar en histórico" de arriba.
           </p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
-                  <th className="py-2 pr-4">Semana</th>
-                  <th className="py-2 pr-4">Desglose</th>
-                  <th className="py-2 pr-4 text-right">Monto efectivo</th>
-                  <th className="py-2 pr-4 text-right"># Efectivo</th>
-                  <th className="py-2 pr-4 text-right"># Tarjeta</th>
-                  <th className="py-2 pr-4 text-right">Envíos efectivo</th>
-                  <th className="py-2 pr-4 text-right">Envíos tarjeta</th>
-                  <th className="py-2 pr-4 text-right">Total envío</th>
-                  <th className="py-2 pr-4 text-right">Efectivo a depositar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historico.map((h, i) => {
-                  const nuevaSemana = i === 0 || historico[i - 1].semana_inicio !== h.semana_inicio;
-                  return (
-                    <tr key={h.id} className="border-b border-ink-100 last:border-0">
-                      <td className="py-2 pr-4 text-ink-700">
-                        {nuevaSemana ? getWeekRange(h.semana_inicio).fullLabel : ""}
-                      </td>
-                      <td className="py-2 pr-4 font-medium text-ink-900">
-                        {CATEGORIA_LABEL[h.categoria] ?? h.categoria}
-                      </td>
-                      <td className="py-2 pr-4 text-right text-ink-700">
-                        {money(h.monto_efectivo)}
-                      </td>
-                      <td className="py-2 pr-4 text-right text-ink-700">{int(h.n_efectivo)}</td>
-                      <td className="py-2 pr-4 text-right text-ink-700">{int(h.n_tarjeta)}</td>
-                      <td className="py-2 pr-4 text-right text-ink-700">
-                        {money(h.envios_efectivo)}
-                      </td>
-                      <td className="py-2 pr-4 text-right text-ink-700">
-                        {money(h.envios_tarjeta)}
-                      </td>
-                      <td className="py-2 pr-4 text-right text-ink-700">{money(h.total_envio)}</td>
-                      <td className="py-2 pr-4 text-right font-semibold text-ink-900">
-                        {money(h.efectivo_depositar)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <p className="mt-1 text-xs text-ink-500">
+              Cada semana muestra el General. Haz clic en una semana para ver Delivery y Mi
+              Flotilla.
+            </p>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
+                    <th className="py-2 pr-4">Semana</th>
+                    <th className="py-2 pr-4 text-right">Monto efectivo</th>
+                    <th className="py-2 pr-4 text-right"># Efectivo</th>
+                    <th className="py-2 pr-4 text-right"># Tarjeta</th>
+                    <th className="py-2 pr-4 text-right">Envíos efectivo</th>
+                    <th className="py-2 pr-4 text-right">Envíos tarjeta</th>
+                    <th className="py-2 pr-4 text-right">Total envío</th>
+                    <th className="py-2 pr-4 text-right">Efectivo a depositar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {semanasHistorico.map((s) => {
+                    const abierta = semanasAbiertas.has(s.semana_inicio);
+                    const puedeDesplegar = s.detalle.length > 0;
+                    return (
+                      <Fragment key={s.semana_inicio}>
+                        <tr
+                          onClick={() => puedeDesplegar && toggleSemana(s.semana_inicio)}
+                          className={`border-b border-ink-100 ${
+                            puedeDesplegar ? "cursor-pointer hover:bg-ink-50" : ""
+                          } ${abierta ? "bg-ink-50" : ""}`}
+                        >
+                          <td className="py-2.5 pr-4">
+                            <button
+                              type="button"
+                              aria-expanded={abierta}
+                              disabled={!puedeDesplegar}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSemana(s.semana_inicio);
+                              }}
+                              className="flex items-center gap-2 whitespace-nowrap text-left font-medium text-ink-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-default"
+                            >
+                              <span
+                                aria-hidden
+                                className={`inline-block text-xs text-ink-500 transition-transform duration-150 motion-reduce:transition-none ${
+                                  abierta ? "rotate-90" : ""
+                                } ${puedeDesplegar ? "" : "invisible"}`}
+                              >
+                                ▶
+                              </span>
+                              {getWeekRange(s.semana_inicio).fullLabel}
+                            </button>
+                          </td>
+                          {s.general ? (
+                            <CeldasHistorico h={s.general} destacado />
+                          ) : (
+                            <td colSpan={7} className="py-2 pr-4 text-right text-xs text-ink-500">
+                              Sin fila General guardada
+                            </td>
+                          )}
+                        </tr>
+                        {abierta &&
+                          s.detalle.map((h) => (
+                            <tr key={h.id} className="border-b border-ink-100 bg-ink-50/50">
+                              <td className="py-2 pl-7 pr-4 text-ink-700">
+                                {CATEGORIA_LABEL[h.categoria] ?? h.categoria}
+                              </td>
+                              <CeldasHistorico h={h} />
+                            </tr>
+                          ))}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
