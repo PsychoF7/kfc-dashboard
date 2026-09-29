@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { OPS_COLUMNS, VENTAS_COLUMNS } from "@/lib/parse/columns";
+import { OPS_COLUMNS, TIEMPOS_COLUMNS, VENTAS_COLUMNS } from "@/lib/parse/columns";
 import { findMissingRequiredColumns, mapRows, readSpreadsheet } from "@/lib/parse/parseFile";
 
 // xlsx necesita el runtime de Node (no Edge), y los archivos semanales
@@ -14,6 +14,11 @@ const BUCKET = "raw-uploads";
 const TIPO_CONFIG = {
   ops: { table: "ops_orders", columns: OPS_COLUMNS, required: ["order_id", "estatus_orden"] },
   ventas: { table: "ventas_orders", columns: VENTAS_COLUMNS, required: ["order_id", "estatus_orden"] },
+  tiempos: {
+    table: "tiempos_orders",
+    columns: TIEMPOS_COLUMNS,
+    required: ["order_id", "estatus_orden", "direccion"],
+  },
 } as const;
 
 type Tipo = keyof typeof TIPO_CONFIG;
@@ -55,7 +60,7 @@ export async function POST(req: Request) {
     }
     if (!TIPO_CONFIG[tipo]) {
       return NextResponse.json(
-        { error: "Tipo de data inválido. Debe ser 'ops' o 'ventas'." },
+        { error: "Tipo de data inválido. Debe ser 'ops', 'ventas' o 'tiempos'." },
         { status: 400 }
       );
     }
