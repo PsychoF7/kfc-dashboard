@@ -4,7 +4,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
-type Tipo = "ops" | "ventas";
+type Tipo = "ops" | "ventas" | "tiempos";
 
 interface UploadResult {
   ok?: boolean;
@@ -147,6 +147,11 @@ export default function UploadPage() {
           tipo="ventas"
           title="Data de Ventas"
           description="Usada para el desglose de pagos y la facturación mensual."
+        />
+        <UploadCard
+          tipo="tiempos"
+          title="Data de Tiempos"
+          description="El CSV kfcDeliveryTimesFrom… — base de Devoluciones y cancelaciones."
         />
       </div>
     </div>
