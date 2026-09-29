@@ -1,5 +1,6 @@
 // Tipos y textos de la sección Devoluciones y cancelaciones.
-// Se usan en el dashboard y en el Excel, para que ambos digan lo mismo.
+// Se usan tanto en el dashboard como en el Excel descargable, para que
+// ambos digan exactamente lo mismo.
 
 export const META_DICIEMBRE = 0.02;
 
@@ -258,7 +259,7 @@ export interface TitularResumen {
 }
 
 /** "MEJORA: la Devolución bajo de 6.72% (semana pasada) a 6.26% esta semana
- * -segunda semana seguida a la baja-." La racha sale de la tendencia. */
+ * -segunda semana seguida a la baja-." La racha se calcula con la tendencia. */
 export function titularResumen(
   reporte: DevReporte,
   tendencia: DevSemanaTendencia[]
@@ -273,6 +274,7 @@ export function titularResumen(
   const baja = diff < 0;
   const ligero = Math.abs(diff) < 0.0025;
 
+  // Direcciones semana contra semana, solo mientras las semanas sean consecutivas.
   const serie = tendencia
     .filter((t) => t.semana_inicio <= reporte.semana.inicio)
     .sort((a, b) => a.semana_inicio.localeCompare(b.semana_inicio));
@@ -344,4 +346,6 @@ export function puntosResumen(reporte: DevReporte): string[] {
 
 export function criterioTexto(op: DevOpciones) {
   const dev = op.incluirReturning ? "RETURNED + RETURNING" : "RETURNED";
-  const canc = op.incluirRechazadas ? "CANCELLED + REJECTED" :
+  const canc = op.incluirRechazadas ? "CANCELLED + REJECTED" : "CANCELLED";
+  return `Criterio: devoluciones = ${dev}; cancelaciones = ${canc}; % sobre el total de ordenes de la semana.`;
+}
