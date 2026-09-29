@@ -2,7 +2,7 @@
 // Así "Creada en", "creada en", "Creada  en", "CREADA EN" son iguales,
 // y toleramos variantes con/sin acento como en tu Apps Script original.
 export function normalizeHeader(value: unknown): string {
-    return String(value ?? "")
+  return String(value ?? "")
     .replace(/\uFEFF/g, "") // carácter invisible que traen algunos CSV al inicio
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -115,6 +115,37 @@ export const VENTAS_COLUMNS: ColumnDef[] = [
   { key: "restaurant", aliases: ["Restaurant", "Restaurante"], type: "text" },
   { key: "repartido_por", aliases: ["Repartido por"], type: "text" },
   { key: "estatus_envio", aliases: ["Estatus de envio", "Estatus de envío"], type: "text" },
+];
+
+// -----------------------------------------------------------------------
+// Data de TIEMPOS (kfcDeliveryTimesFrom_...csv) — base de la sección de
+// Devoluciones y cancelaciones (y después de Análisis de tiempos).
+// Calle/colonia/CP y los problemas de dirección los calcula Supabase
+// solo al guardar (ver supabase/devoluciones.sql).
+// -----------------------------------------------------------------------
+export const TIEMPOS_COLUMNS: ColumnDef[] = [
+  { key: "order_id", aliases: ["ID de la orden", "orderId", "order_id"], type: "text" },
+  { key: "creada_en", aliases: ["Fecha de creacion", "Fecha de creación", "Creada en"], type: "datetime" },
+  { key: "direccion", aliases: ["Direccion", "Dirección"], type: "text" },
+  { key: "estatus_orden", aliases: ["Estatus", "Estatus de orden"], type: "text" },
+  { key: "motivo_cancelacion", aliases: ["Motivo de cancelacion", "Motivo de cancelación"], type: "text" },
+  { key: "restaurant_id", aliases: ["ID del restaurante", "restaurantId"], type: "text" },
+  { key: "restaurant", aliases: ["Nombre del restaurante", "Restaurant"], type: "text" },
+  { key: "cliente", aliases: ["Nombre del cliente"], type: "text" },
+  { key: "telefono_raw", aliases: ["Numero del cliente", "Número del cliente"], type: "text" },
+  { key: "total", aliases: ["Total"], type: "number" },
+  { key: "repartido_por", aliases: ["Repartido por"], type: "text" },
+  { key: "metodo_pago", aliases: ["Metodo de pago", "Método de pago"], type: "text" },
+  { key: "latitud", aliases: ["Latitud de cliente"], type: "number" },
+  { key: "longitud", aliases: ["Longitud de cliente"], type: "number" },
+  { key: "tiempo_aceptacion_restaurante", aliases: ["Tiempo de aceptacion de restaurante"], type: "number" },
+  { key: "tiempo_aceptacion_repartidor", aliases: ["Tiempo de aceptacion de repartidor"], type: "number" },
+  { key: "tiempo_llegar_tienda", aliases: ["Tiempo para llegar a tienda"], type: "number" },
+  { key: "tiempo_recoger", aliases: ["Tiempo para recoger"], type: "number" },
+  { key: "tiempo_entregar", aliases: ["Tiempo para entregar"], type: "number" },
+  { key: "tiempo_completar", aliases: ["Tiempo para completar"], type: "number" },
+  { key: "sla_45", aliases: ["Tiempo total sin cooking time <45"], type: "boolean" },
+  { key: "sla_60", aliases: ["Tiempo total sin cooking time <60"], type: "boolean" },
 ];
 
 // Una tienda es "Mi Flotilla" si su nombre termina en " MF"
