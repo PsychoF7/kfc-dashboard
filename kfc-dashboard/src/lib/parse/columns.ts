@@ -2,7 +2,8 @@
 // Así "Creada en", "creada en", "Creada  en", "CREADA EN" son iguales,
 // y toleramos variantes con/sin acento como en tu Apps Script original.
 export function normalizeHeader(value: unknown): string {
-  return String(value ?? "")
+    return String(value ?? "")
+    .replace(/\uFEFF/g, "") // carácter invisible que traen algunos CSV al inicio
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
