@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { getWeekRange } from "@/lib/week";
+import Panorama from "@/components/devoluciones/Panorama";
 import {
   META_DICIEMBRE,
   DevGrupo,
@@ -48,71 +49,6 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
   return (
     <div className={clsx("rounded-xl border border-ink-100 bg-white p-5 shadow-card", className)}>
       {children}
-    </div>
-  );
-}
-
-function Switch({
-  checked,
-  onChange,
-  label,
-  hint,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  hint: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={clsx(
-          "relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500",
-          checked ? "bg-brand-500" : "bg-ink-200"
-        )}
-      >
-        <span
-          className={clsx(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform motion-reduce:transition-none",
-            checked ? "translate-x-4" : "translate-x-0.5"
-          )}
-        />
-      </button>
-      <span>
-        <span className="block text-sm font-medium text-ink-900">{label}</span>
-        <span className="block text-xs text-ink-500">{hint}</span>
-      </span>
-    </label>
-  );
-}
-
-function Kpi({
-  titulo,
-  valor,
-  detalle,
-  tono = "neutral",
-}: {
-  titulo: string;
-  valor: string;
-  detalle?: React.ReactNode;
-  tono?: "neutral" | "bien" | "mal";
-}) {
-  return (
-    <div className="rounded-xl border border-ink-100 bg-white p-4 shadow-card">
-      <p className="text-xs font-medium text-ink-500">{titulo}</p>
-      <p
-        className={clsx(
-          "mt-1 text-2xl font-semibold tabular-nums",
-          tono === "bien" ? "text-success" : tono === "mal" ? "text-danger" : "text-ink-900"
-        )}
-      >
-        {valor}
-      </p>
-      {detalle && <div className="mt-1 text-xs text-ink-500">{detalle}</div>}
     </div>
   );
 }
@@ -493,21 +429,35 @@ export default function DevolucionesPage() {
   const hayData = !!r && r.total > 0;
   const titular = reporte && hayData ? titularResumen(reporte, tendencia) : null;
   const mes = reporte ? nombreMes(reporte.linea_base.inicio) : "";
-  const pctProblema = r ? div(r.devueltas + r.canceladas, r.total) : 0;
   const verTodas = (k: string) => setTodas((p) => ({ ...p, [k]: !p[k] }));
   const recortar = <T,>(k: string, filas: T[]) => (todas[k] ? filas : filas.slice(0, FILAS_INICIALES));
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-7xl px-6 py-8">
       <h1 className="text-xl font-semibold text-ink-900">Devoluciones y cancelaciones</h1>
       <p className="mt-1 text-sm text-ink-500">
-        El reporte semanal que compartes con KFC, calculado desde la data de tiempos, y el avance
-        hacia la meta de 2% en diciembre.
+        Panorama general de devueltas y canceladas, y abajo el reporte semanal que compartes con
+        KFC. Meta de diciembre: 2%.
       </p>
 
-      {/* Controles */}
-      <Card className="mt-6">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <Panorama
+        incluirReturning={incluirReturning}
+        incluirRechazadas={incluirRechazadas}
+        onIncluirReturning={setIncluirReturning}
+        onIncluirRechazadas={setIncluirRechazadas}
+      />
+
+      {/* Reporte semanal */}
+      <div className="mt-12 border-t border-ink-100 pt-8">
+        <h2 className="text-lg font-semibold text-ink-900">Reporte semanal para KFC</h2>
+        <p className="mt-1 text-sm text-ink-500">
+          Duplicados, casos, calidad de dirección y ranking de una semana, con el Excel listo para
+          compartir.
+        </p>
+      </div>
+
+      <Card className="mt-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <label className="text-xs font-medium text-ink-500" htmlFor="semana">
               Elige cualquier día de la semana a revisar
@@ -520,20 +470,6 @@ export default function DevolucionesPage() {
               className="mt-1 block rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
             {week && <p className="mt-2 text-sm text-ink-700">{week.fullLabel}</p>}
-          </div>
-          <div className="flex flex-col gap-3">
-            <Switch
-              checked={incluirReturning}
-              onChange={setIncluirReturning}
-              label="Contar RETURNING como devuelta"
-              hint="Además de RETURNED, las que van de regreso a tienda."
-            />
-            <Switch
-              checked={incluirRechazadas}
-              onChange={setIncluirRechazadas}
-              label="Contar rechazadas como canceladas"
-              hint="Suma REJECTED a CANCELLED en el % de cancelación."
-            />
           </div>
           <button
             onClick={descargarExcel}
@@ -564,72 +500,8 @@ export default function DevolucionesPage() {
 
       {!loading && reporte && r && hayData && (
         <>
-          {/* KPIs */}
-          <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Kpi
-              titulo="% Devolución"
-              valor={pct(r.pct_dev)}
-              tono={(r.pct_dev ?? 0) <= META_DICIEMBRE ? "bien" : "neutral"}
-              detalle={
-                <>
-                  {r.prev_total > 0 && r.prev_pct_dev != null && (
-                    <span
-                      className={clsx(
-                        "font-medium",
-                        (r.pct_dev ?? 0) < r.prev_pct_dev ? "text-success" : "text-danger"
-                      )}
-                    >
-                      {(r.pct_dev ?? 0) < r.prev_pct_dev ? "▼" : "▲"}{" "}
-                      {Math.abs(((r.pct_dev ?? 0) - r.prev_pct_dev) * 100).toFixed(2)} pts vs semana pasada
-                    </span>
-                  )}
-                  <span className="block">
-                    {(r.pct_dev ?? 0) > META_DICIEMBRE
-                      ? `Faltan ${(((r.pct_dev ?? 0) - META_DICIEMBRE) * 100).toFixed(2)} pts para la meta`
-                      : "Dentro de la meta de diciembre"}
-                  </span>
-                </>
-              }
-            />
-            <Kpi
-              titulo={incluirRechazadas ? "% Cancelación (incl. rechazadas)" : "% Cancelación"}
-              valor={pct(r.pct_canc)}
-              tono={(r.pct_canc ?? 0) <= META_DICIEMBRE ? "bien" : "neutral"}
-              detalle={
-                <>
-                  {r.prev_total > 0 && r.prev_pct_canc != null && (
-                    <span
-                      className={clsx(
-                        "font-medium",
-                        (r.pct_canc ?? 0) < r.prev_pct_canc ? "text-success" : "text-danger"
-                      )}
-                    >
-                      {(r.pct_canc ?? 0) < r.prev_pct_canc ? "▼" : "▲"}{" "}
-                      {Math.abs(((r.pct_canc ?? 0) - r.prev_pct_canc) * 100).toFixed(2)} pts vs semana pasada
-                    </span>
-                  )}
-                  <span className="block">
-                    {(r.pct_canc ?? 0) > META_DICIEMBRE
-                      ? `Faltan ${(((r.pct_canc ?? 0) - META_DICIEMBRE) * 100).toFixed(2)} pts para la meta`
-                      : "Dentro de la meta de diciembre"}
-                  </span>
-                </>
-              }
-            />
-            <Kpi
-              titulo="% Problema total"
-              valor={pct(pctProblema)}
-              detalle="Devoluciones + cancelaciones sobre el total"
-            />
-            <Kpi
-              titulo="Órdenes devueltas"
-              valor={int(r.devueltas)}
-              detalle={`de ${int(r.total)} órdenes · ${int(r.canceladas)} canceladas`}
-            />
-          </div>
-
           {/* Resumen + tendencia */}
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-5">
+          <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-5">
             <Card className="lg:col-span-2">
               <h2 className="text-sm font-semibold text-ink-900">Resumen de la semana</h2>
               {titular && (
@@ -649,7 +521,7 @@ export default function DevolucionesPage() {
               </ul>
             </Card>
             <Card className="lg:col-span-3">
-              <h2 className="text-sm font-semibold text-ink-900">Tendencia semanal contra la meta</h2>
+              <h2 className="text-sm font-semibold text-ink-900">% por semana (últimas 12)</h2>
               <div className="mt-3">
                 <Tendencia datos={tendencia} semanaActual={reporte.semana.inicio} />
               </div>
