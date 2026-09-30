@@ -6,7 +6,7 @@ import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import { META_DICIEMBRE, sumarDias } from "@/lib/devoluciones";
-import { colorPct, type ModoMapa, type PuntoMapa, type TiendaMapa } from "./MapaDevoluciones";
+import { colorPct, type MetricaMapa, type TiendaMapa } from "./MapaDevoluciones";
 
 // Leaflet solo corre en el navegador
 const MapaDevoluciones = dynamic(() => import("./MapaDevoluciones"), {
@@ -15,7 +15,8 @@ const MapaDevoluciones = dynamic(() => import("./MapaDevoluciones"), {
 });
 
 interface Filtros {
-  estados: string[];
+  zonas: string[];
+  ciudades: string[];
   tiendas: string[];
   repartidores: string[];
   fecha_min: string | null;
@@ -42,10 +43,9 @@ interface PanoramaData {
   };
   por_dia: { dia: string; total: number; devueltas: number; canceladas: number; pct_dev: number; pct_canc: number }[];
   tiendas: TiendaMapa[];
-  puntos: PuntoMapa[];
   motivos: { motivo: string; ordenes: number }[];
   repartidores: { repartidor: string; ordenes: number; devueltas: number; canceladas: number; pct_dev: number; pct_canc: number }[];
-  estados: { estado: string; ordenes: number; devueltas: number; pct_dev: number }[];
+  zonas: { zona: string; ordenes: number; devueltas: number; canceladas: number; pct_dev: number; pct_canc: number }[];
 }
 
 const MOTIVOS: Record<string, string> = {
@@ -58,6 +58,7 @@ const MOTIVOS: Record<string, string> = {
   NO_CUSTOMER_CONTACT: "Sin contacto con el cliente",
   ERROR_WITH_CUSTOMER_DATA: "Error en datos del cliente",
   CLOSED_STORE: "Tienda cerrada",
+  RETURNED_TO_RESTAURANT: "Regresada al restaurante",
   "SIN MOTIVO": "Sin motivo registrado",
 };
 
@@ -193,7 +194,7 @@ function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
   );
 }
 
-/** Barra horizontal simple para listas (motivos, estados, repartidor). */
+/** Barra horizontal simple para listas (motivos, zonas). */
 function Barra({ valor, max, color = "bg-brand-500" }: { valor: number; max: number; color?: string }) {
   return (
     <div className="h-1.5 w-full rounded-full bg-ink-100">
@@ -205,27 +206,21 @@ function Barra({ valor, max, color = "bg-brand-500" }: { valor: number; max: num
 // ---------------------------------------------------------------------
 // Panorama
 // ---------------------------------------------------------------------
-export default function Panorama({
-  incluirReturning,
-  incluirRechazadas,
-  onIncluirReturning,
-  onIncluirRechazadas,
-}: {
-  incluirReturning: boolean;
-  incluirRechazadas: boolean;
-  onIncluirReturning: (v: boolean) => void;
-  onIncluirRechazadas: (v: boolean) => void;
-}) {
+export default function Panorama() {
   const [opciones, setOpciones] = useState<Filtros | null>(null);
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
-  const [estados, setEstados] = useState<string[]>([]);
+  const [zonas, setZonas] = useState<string[]>([]);
+  const [ciudades, setCiudades] = useState<string[]>([]);
   const [tiendas, setTiendas] = useState<string[]>([]);
+  // Prendidos = mismo criterio que el panel principal
+  const [incluirReturning, setIncluirReturning] = useState(true);
+  const [incluirRechazadas, setIncluirRechazadas] = useState(true);
   const [repartidores, setRepartidores] = useState<string[]>([]);
   const [data, setData] = useState<PanoramaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [modoMapa, setModoMapa] = useState<ModoMapa>("tiendas");
+  const [metrica, setMetrica] = useState<MetricaMapa>("dev");
   const [minOrdenes, setMinOrdenes] = useState(20);
 
   // Opciones de filtro + periodo por defecto: las últimas 4 semanas con data
@@ -236,9 +231,7 @@ export default function Panorama({
         if (res?.error) throw new Error(res.error);
         setOpciones(res);
         if (res.fecha_max) {
-          setHasta(res.fecha_max);
-          const inicio = sumarDias(res.fecha_max, -27);
-          setDesde(res.fecha_min && res.fecha_min > inicio ? res.fecha_min : inicio);
+          periodoInicial(res);
         } else {
           setLoading(false);
         }
@@ -252,11 +245,12 @@ export default function Panorama({
   const query = useMemo(() => {
     if (!desde || !hasta) return "";
     const p = new URLSearchParams({ desde, hasta, returning: incluirReturning ? "1" : "0", rechazadas: incluirRechazadas ? "1" : "0" });
-    estados.forEach((v) => p.append("estado", v));
+    zonas.forEach((v) => p.append("zona", v));
+    ciudades.forEach((v) => p.append("ciudad", v));
     tiendas.forEach((v) => p.append("tienda", v));
     repartidores.forEach((v) => p.append("repartidor", v));
     return p.toString();
-  }, [desde, hasta, estados, tiendas, repartidores, incluirReturning, incluirRechazadas]);
+  }, [desde, hasta, zonas, ciudades, tiendas, repartidores, incluirReturning, incluirRechazadas]);
 
   useEffect(() => {
     if (!query) return;
@@ -275,6 +269,24 @@ export default function Panorama({
     return () => clearTimeout(t);
   }, [query]);
 
+  /** Últimas 4 semanas con data (el periodo con el que abre la página). */
+  function periodoInicial(o: Filtros) {
+    if (!o.fecha_max) return;
+    const inicio = sumarDias(o.fecha_max, -27);
+    setHasta(o.fecha_max);
+    setDesde(o.fecha_min && o.fecha_min > inicio ? o.fecha_min : inicio);
+  }
+
+  function limpiarFiltros() {
+    setZonas([]);
+    setCiudades([]);
+    setTiendas([]);
+    setRepartidores([]);
+    setIncluirReturning(true);
+    setIncluirRechazadas(true);
+    if (opciones) periodoInicial(opciones);
+  }
+
   function preset(dias: number) {
     if (!opciones?.fecha_max) return;
     setHasta(opciones.fecha_max);
@@ -287,20 +299,27 @@ export default function Panorama({
     () =>
       (data?.tiendas ?? [])
         .filter((t) => t.ordenes >= minOrdenes)
-        .sort((a, b) => b.pct_dev - a.pct_dev)
+        .sort((a, b) => (metrica === "dev" ? b.pct_dev - a.pct_dev : b.pct_canc - a.pct_canc))
         .slice(0, 10),
-    [data, minOrdenes]
+    [data, minOrdenes, metrica]
   );
   const maxMotivo = Math.max(0, ...(data?.motivos ?? []).map((m) => m.ordenes));
-  const maxEstado = Math.max(0, ...(data?.estados ?? []).map((e) => e.devueltas));
+  const maxZona = Math.max(0, ...(data?.zonas ?? []).map((z) => z.devueltas + z.canceladas));
+  const hayFiltros =
+    zonas.length + ciudades.length + tiendas.length + repartidores.length > 0 ||
+    !incluirReturning ||
+    !incluirRechazadas;
   const cargando = (v: string) => (loading ? "…" : v);
+  const sinUbicacion = (data?.tiendas ?? []).filter(
+    (t) => t.ordenes >= minOrdenes && (t.lat == null || t.lon == null)
+  ).length;
 
   if (opciones && !opciones.fecha_max) {
     return (
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 text-sm text-ink-700 shadow-card">
-        Todavía no hay data de tiempos cargada. Súbela en{" "}
+        Todavía no hay data de operaciones cargada. Súbela en{" "}
         <a href="/upload" className="font-medium text-brand-600 hover:underline">Cargar datos</a> (tarjeta
-        &quot;Data de Tiempos&quot;).
+        &quot;Data de Operaciones&quot;).
       </div>
     );
   }
@@ -310,7 +329,10 @@ export default function Panorama({
       {/* Filtros */}
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-4 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-ink-900">Filtros</h2>
+          <div>
+            <h2 className="text-sm font-semibold text-ink-900">Filtros</h2>
+            <p className="text-xs text-ink-500">Data de operaciones, mismo criterio que el panel principal.</p>
+          </div>
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-ink-500">Rápido:</span>
             {[
@@ -327,18 +349,17 @@ export default function Panorama({
               </button>
             ))}
             <button
-              onClick={() => {
-                setEstados([]);
-                setTiendas([]);
-                setRepartidores([]);
-              }}
-              className="ml-2 font-medium text-brand-600 hover:text-brand-700"
+              onClick={limpiarFiltros}
+              className={clsx(
+                "ml-2 rounded-md px-2 py-1 font-medium",
+                hayFiltros ? "bg-brand-50 text-brand-700 hover:bg-brand-100" : "text-brand-600 hover:text-brand-700"
+              )}
             >
               Limpiar filtros
             </button>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-ink-500">Desde</label>
             <input type="date" className={inputFecha} value={desde} onChange={(e) => setDesde(e.target.value)} />
@@ -347,7 +368,8 @@ export default function Panorama({
             <label className="text-xs font-medium text-ink-500">Hasta</label>
             <input type="date" className={inputFecha} value={hasta} onChange={(e) => setHasta(e.target.value)} />
           </div>
-          <MultiSelectFilter label="Estado" items={opciones?.estados ?? []} selected={estados} onChange={setEstados} />
+          <MultiSelectFilter label="Zona" items={opciones?.zonas ?? []} selected={zonas} onChange={setZonas} />
+          <MultiSelectFilter label="Ciudad" items={opciones?.ciudades ?? []} selected={ciudades} onChange={setCiudades} />
           <MultiSelectFilter label="Tienda" items={opciones?.tiendas ?? []} selected={tiendas} onChange={setTiendas} />
           <MultiSelectFilter
             label="Repartido por"
@@ -361,21 +383,21 @@ export default function Panorama({
             <input
               type="checkbox"
               checked={incluirReturning}
-              onChange={(e) => onIncluirReturning(e.target.checked)}
+              onChange={(e) => setIncluirReturning(e.target.checked)}
               className="h-4 w-4 rounded border-ink-300 accent-brand-500"
             />
-            Contar RETURNING como devuelta
+            Contar RETURNING como devuelta (van de regreso a tienda)
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-ink-700">
             <input
               type="checkbox"
               checked={incluirRechazadas}
-              onChange={(e) => onIncluirRechazadas(e.target.checked)}
+              onChange={(e) => setIncluirRechazadas(e.target.checked)}
               className="h-4 w-4 rounded border-ink-300 accent-brand-500"
             />
             Contar rechazadas como canceladas
           </label>
-          <span className="text-xs text-ink-500">Aplica a todo: panorama, reporte semanal y Excel.</span>
+          <span className="text-xs text-ink-500">Solo aplica a este panorama.</span>
         </div>
       </div>
 
@@ -437,26 +459,27 @@ export default function Panorama({
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card xl:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-ink-900">¿Dónde se concentran las devoluciones?</h2>
+              <h2 className="text-sm font-semibold text-ink-900">
+                ¿Dónde se concentran las {metrica === "dev" ? "devoluciones" : "cancelaciones"}?
+              </h2>
               <p className="mt-1 text-xs text-ink-500">
-                {modoMapa === "tiendas"
-                  ? "Cada círculo es una tienda, ubicada en el centro de su zona de entrega. Tamaño = devueltas; color = % de devolución."
-                  : "Cada punto es una orden devuelta, en la ubicación del cliente."}
+                Cada círculo es una tienda. Tamaño = número de {metrica === "dev" ? "devueltas" : "canceladas"};
+                color = qué tan lejos está de la meta.
               </p>
             </div>
             <div className="inline-flex rounded-lg border border-ink-200 p-0.5">
               {(
                 [
-                  ["tiendas", "Por tienda"],
-                  ["ordenes", "Órdenes devueltas"],
-                ] as [ModoMapa, string][]
+                  ["dev", "Devoluciones"],
+                  ["canc", "Cancelaciones"],
+                ] as [MetricaMapa, string][]
               ).map(([id, label]) => (
                 <button
                   key={id}
-                  onClick={() => setModoMapa(id)}
+                  onClick={() => setMetrica(id)}
                   className={clsx(
                     "rounded-md px-3 py-1.5 text-xs font-medium",
-                    modoMapa === id ? "bg-brand-500 text-white" : "text-ink-700 hover:bg-ink-50"
+                    metrica === id ? "bg-brand-500 text-white" : "text-ink-700 hover:bg-ink-50"
                   )}
                 >
                   {label}
@@ -465,34 +488,22 @@ export default function Panorama({
             </div>
           </div>
           <div className="mt-3">
-            <MapaDevoluciones
-              tiendas={data?.tiendas ?? []}
-              puntos={data?.puntos ?? []}
-              modo={modoMapa}
-              minOrdenes={minOrdenes}
-            />
+            <MapaDevoluciones tiendas={data?.tiendas ?? []} metrica={metrica} minOrdenes={minOrdenes} />
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-500">
-            {modoMapa === "tiendas" ? (
-              <div className="flex flex-wrap items-center gap-3">
-                {[
-                  [0.02, "≤ 2% (meta)"],
-                  [0.05, "2–5%"],
-                  [0.08, "5–8%"],
-                  [0.2, "> 8%"],
-                ].map(([v, l]) => (
-                  <span key={l as string} className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-full" style={{ background: colorPct(v as number) }} />
-                    {l}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <span>
-                {int(data?.puntos.length)} órdenes devueltas en el mapa
-                {(data?.puntos.length ?? 0) >= 6000 ? " (se muestran las 6,000 más recientes)" : ""}
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {[
+                [0.02, "≤ 2% (meta)"],
+                [0.05, "2–5%"],
+                [0.08, "5–8%"],
+                [0.2, "> 8%"],
+              ].map(([v, l]) => (
+                <span key={l as string} className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-full" style={{ background: colorPct(v as number) }} />
+                  {l}
+                </span>
+              ))}
+            </div>
             <label className="flex items-center gap-2">
               Mínimo de órdenes por tienda
               <select
@@ -508,10 +519,18 @@ export default function Panorama({
               </select>
             </label>
           </div>
+          {sinUbicacion > 0 && (
+            <p className="mt-2 text-xs text-ink-500">
+              {sinUbicacion} {sinUbicacion === 1 ? "tienda no aparece" : "tiendas no aparecen"} en el mapa
+              porque todavía no tienen data de tiempos cargada (de ahí se toma su ubicación).
+            </p>
+          )}
         </div>
 
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-ink-900">Tiendas con mayor % de devolución</h2>
+          <h2 className="text-sm font-semibold text-ink-900">
+            Tiendas con mayor % de {metrica === "dev" ? "devolución" : "cancelación"}
+          </h2>
           <p className="mt-1 text-xs text-ink-500">Con {minOrdenes}+ órdenes en el periodo.</p>
           <ol className="mt-4 space-y-3">
             {topTiendas.map((t, i) => (
@@ -521,12 +540,17 @@ export default function Panorama({
                     <span className="mr-1.5 text-xs text-ink-300">{i + 1}</span>
                     {t.tienda}
                   </span>
-                  <span className="flex-shrink-0 font-semibold tabular-nums" style={{ color: colorPct(t.pct_dev) }}>
-                    {pct(t.pct_dev, 1)}
+                  <span
+                    className="flex-shrink-0 font-semibold tabular-nums"
+                    style={{ color: colorPct(metrica === "dev" ? t.pct_dev : t.pct_canc) }}
+                  >
+                    {pct(metrica === "dev" ? t.pct_dev : t.pct_canc, 1)}
                   </span>
                 </div>
                 <p className="text-xs text-ink-500">
-                  {int(t.devueltas)} de {int(t.ordenes)} órdenes · {money(t.monto_devuelto)}
+                  {metrica === "dev"
+                    ? `${int(t.devueltas)} de ${int(t.ordenes)} órdenes · ${money(t.monto_devuelto)}`
+                    : `${int(t.canceladas)} de ${int(t.ordenes)} órdenes`}
                 </p>
               </li>
             ))}
@@ -537,10 +561,10 @@ export default function Panorama({
         </div>
       </div>
 
-      {/* Motivos, repartidor, estados */}
+      {/* Motivos, repartidor, zonas */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-ink-900">Motivos de cancelación</h2>
+          <h2 className="text-sm font-semibold text-ink-900">Motivos de cancelación y rechazo</h2>
           <ul className="mt-4 space-y-3">
             {(data?.motivos ?? []).map((m) => (
               <li key={m.motivo}>
@@ -584,20 +608,25 @@ export default function Panorama({
         </div>
 
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-ink-900">Devoluciones por estado</h2>
+          <h2 className="text-sm font-semibold text-ink-900">Por zona</h2>
+          <p className="mt-1 text-xs text-ink-500">Barra = devueltas + canceladas.</p>
           <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
-            {(data?.estados ?? []).map((e) => (
-              <li key={e.estado}>
+            {(data?.zonas ?? []).map((z) => (
+              <li key={z.zona}>
                 <div className="flex justify-between gap-2 text-sm">
-                  <span className="truncate text-ink-900">{e.estado}</span>
-                  <span className="flex-shrink-0 tabular-nums text-ink-700">
-                    {int(e.devueltas)}{" "}
-                    <span className="font-semibold" style={{ color: colorPct(e.pct_dev) }}>
-                      ({pct(e.pct_dev, 1)})
+                  <span className="truncate text-ink-900">{z.zona}</span>
+                  <span className="flex-shrink-0 text-xs tabular-nums text-ink-700">
+                    Dev.{" "}
+                    <span className="font-semibold" style={{ color: colorPct(z.pct_dev) }}>
+                      {pct(z.pct_dev, 1)}
+                    </span>{" "}
+                    · Canc.{" "}
+                    <span className="font-semibold" style={{ color: colorPct(z.pct_canc) }}>
+                      {pct(z.pct_canc, 1)}
                     </span>
                   </span>
                 </div>
-                <Barra valor={e.devueltas} max={maxEstado} />
+                <Barra valor={z.devueltas + z.canceladas} max={maxZona} />
               </li>
             ))}
           </ul>
