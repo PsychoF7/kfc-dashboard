@@ -355,8 +355,6 @@ function TablaDuplicados({
 // ---------------------------------------------------------------------
 export default function DevolucionesPage() {
   const [anchorDate, setAnchorDate] = useState(semanaPasada);
-  const [incluirReturning, setIncluirReturning] = useState(false);
-  const [incluirRechazadas, setIncluirRechazadas] = useState(true);
   const [reporte, setReporte] = useState<DevReporte | null>(null);
   const [tendencia, setTendencia] = useState<DevSemanaTendencia[]>([]);
   const [loading, setLoading] = useState(false);
@@ -367,11 +365,9 @@ export default function DevolucionesPage() {
   const [todas, setTodas] = useState<Record<string, boolean>>({});
 
   const week = useMemo(() => (anchorDate ? getWeekRange(anchorDate) : null), [anchorDate]);
-  const query = week
-    ? `week_start=${week.start}&week_end=${week.end}&returning=${incluirReturning ? 1 : 0}&rechazadas=${
-        incluirRechazadas ? 1 : 0
-      }`
-    : "";
+  // El reporte semanal usa siempre el mismo criterio que tu reporte para KFC
+  // (data de tiempos): devueltas = RETURNED; canceladas = CANCELLED + REJECTED.
+  const query = week ? `week_start=${week.start}&week_end=${week.end}` : "";
 
   useEffect(() => {
     if (!week) return;
@@ -440,18 +436,14 @@ export default function DevolucionesPage() {
         KFC. Meta de diciembre: 2%.
       </p>
 
-      <Panorama
-        incluirReturning={incluirReturning}
-        incluirRechazadas={incluirRechazadas}
-        onIncluirReturning={setIncluirReturning}
-        onIncluirRechazadas={setIncluirRechazadas}
-      />
+      <Panorama />
 
       {/* Reporte semanal */}
       <div className="mt-12 border-t border-ink-100 pt-8">
         <h2 className="text-lg font-semibold text-ink-900">Reporte semanal para KFC</h2>
         <p className="mt-1 text-sm text-ink-500">
-          Duplicados, casos, calidad de dirección y ranking de una semana, con el Excel listo para
+          Se calcula solo con la data de tiempos (la que trae teléfonos, coordenadas y direcciones):
+          duplicados, casos, calidad de dirección y ranking de una semana, con el Excel listo para
           compartir.
         </p>
       </div>
