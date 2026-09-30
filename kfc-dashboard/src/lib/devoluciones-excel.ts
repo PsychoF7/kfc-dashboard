@@ -5,7 +5,12 @@ import {
   DevSemanaTendencia,
   TipoDuplicado,
   DevGrupo,
+  ClimaDia,
+  Incidencia,
+  climaPorDia,
   criterioTexto,
+  lineaClimaDia,
+  lineaIncidencia,
   esAlerta,
   mapsUrl,
   nombreMes,
@@ -198,7 +203,14 @@ function sinDatos(ws: WS, fila: number, hasta: string, texto: string) {
 // Hojas
 // =====================================================================
 
-function hojaResumen(wb: ExcelJS.Workbook, rep: DevReporte, tend: DevSemanaTendencia[], op: DevOpciones) {
+function hojaResumen(
+  wb: ExcelJS.Workbook,
+  rep: DevReporte,
+  tend: DevSemanaTendencia[],
+  op: DevOpciones,
+  incidencias: Incidencia[],
+  clima: ClimaDia[]
+) {
   const ws = prepararHoja(wb, "Resumen", { B: 17, C: 13, D: 13, E: 13, F: 13, G: 13, H: 13, I: 13, J: 13, K: 13, L: 3 });
   const r = rep.resumen;
 
@@ -267,6 +279,31 @@ function hojaResumen(wb: ExcelJS.Workbook, rep: DevReporte, tend: DevSemanaTende
     c.font = { name: FONT, size: 10, color: { argb: C.texto } };
     c.alignment = { wrapText: true, vertical: "middle" };
     ws.getRow(fila).height = 27.75;
+    fila++;
+  }
+  const lineasContexto = [
+    ...incidencias.map((i) => ({ fecha: i.fecha_inicio, texto: lineaIncidencia(i) })),
+    ...climaPorDia(clima).map((g) => ({ fecha: g.fecha, texto: lineaClimaDia(g.fecha, g.ciudades) })),
+  ].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (lineasContexto.length > 0) {
+    fila++;
+    ws.mergeCells(`B${fila}:K${fila}`);
+    const h = ws.getCell(`B${fila}`);
+    h.value = "Contexto de la semana (incidencias que pueden explicar el resultado):";
+    h.font = { name: FONT, size: 10, bold: true, color: { argb: C.texto } };
+    h.alignment = { vertical: "middle" };
+    ws.getRow(fila).height = 20;
+    fila++;
+    for (const linea of lineasContexto) {
+      ws.mergeCells(`B${fila}:K${fila}`);
+      const c = ws.getCell(`B${fila}`);
+      c.value = `• ${linea.texto}`;
+      c.font = { name: FONT, size: 10, color: { argb: C.texto } };
+      c.fill = fill("FFFFF4D6");
+      c.alignment = { wrapText: true, vertical: "middle", indent: 1 };
+      ws.getRow(fila).height = linea.texto.length > 150 ? 41.25 : 27.75;
+      fila++;
+    }
     fila++;
   }
   nota(ws, fila, criterioTexto(op), "K");
@@ -634,13 +671,15 @@ function hojaRanking(wb: ExcelJS.Workbook, rep: DevReporte, op: DevOpciones) {
 export async function construirExcelDevoluciones(
   rep: DevReporte,
   tendencia: DevSemanaTendencia[],
-  op: DevOpciones
+  op: DevOpciones,
+  incidencias: Incidencia[] = [],
+  clima: ClimaDia[] = []
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Panel Operativo KFC";
   wb.created = new Date();
 
-  hojaResumen(wb, rep, tendencia, op);
+  hojaResumen(wb, rep, tendencia, op, incidencias, clima);
   hojaPersiste(wb, rep);
   hojaEspera(wb, rep);
   hojaCalidad(wb, rep);
