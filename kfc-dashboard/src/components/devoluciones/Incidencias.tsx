@@ -9,8 +9,10 @@ import {
   AlcanceIncidencia,
   ClimaDia,
   Incidencia,
+  RELEVANCIA_CLIMA,
   UMBRALES_CLIMA,
   climaPorDia,
+  impactoClima,
   detalleClima,
   nombreCiudad,
   TIPOS_INCIDENCIA,
@@ -85,6 +87,7 @@ export default function Incidencias({
 }) {
   const [verDescartados, setVerDescartados] = useState(false);
   const [verTodosDias, setVerTodosDias] = useState(false);
+  const [climaAbierto, setClimaAbierto] = useState(false);
 
   async function actualizarClima(c: ClimaDia, cambios: { nota?: string; descartado?: boolean }) {
     const res = await fetch("/api/devoluciones/clima", {
@@ -327,15 +330,45 @@ export default function Incidencias({
         </ul>
       )}
 
-      {/* Clima detectado automáticamente */}
+      {/* Clima detectado automáticamente (desplegable) */}
       <div className="mt-6 border-t border-ink-100 pt-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-          🌧️ Mal clima detectado automáticamente
-        </h3>
-        <p className="mt-1 text-xs text-ink-500">
+        <button
+          type="button"
+          onClick={() => setClimaAbierto(!climaAbierto)}
+          aria-expanded={climaAbierto}
+          className="flex w-full items-center justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <span className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className={clsx(
+                "inline-block text-[10px] text-ink-500 transition-transform motion-reduce:transition-none",
+                climaAbierto && "rotate-90"
+              )}
+            >
+              ▶
+            </span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              🌧️ Mal clima detectado automáticamente
+            </span>
+          </span>
+          <span className="text-xs text-ink-500">
+            {diasClima.length === 0
+              ? "Sin días relevantes"
+              : `${diasClima.length} ${diasClima.length === 1 ? "día" : "días"} · ${
+                  new Set(clima.filter((c) => !c.descartado).map((c) => c.ciudad)).size
+                } ${new Set(clima.filter((c) => !c.descartado).map((c) => c.ciudad)).size === 1 ? "ciudad" : "ciudades"}`}
+            <span className="ml-2 font-medium text-brand-600">{climaAbierto ? "Ocultar" : "Ver"}</span>
+          </span>
+        </button>
+        {climaAbierto && (
+        <>
+        <p className="mt-2 text-xs text-ink-500">
           Se revisa solo el clima de cada ciudad por día. Cuenta como mal clima: lluvia de{" "}
           {UMBRALES_CLIMA.lluvia_mm} mm o más, tormenta eléctrica con {UMBRALES_CLIMA.tormenta_lluvia_mm} mm o más,
-          o ráfagas de {UMBRALES_CLIMA.rafaga_kmh} km/h o más. La nota es opcional; si no afectó a la operación,
+          o ráfagas de {UMBRALES_CLIMA.rafaga_kmh} km/h o más. Solo se muestra cuando la ciudad pesa en la
+          operación ese día: al menos {RELEVANCIA_CLIMA.min_ordenes} órdenes y al menos{" "}
+          {RELEVANCIA_CLIMA.min_pct_dia * 100}% de las órdenes KFC del día. La nota es opcional; si no afectó,
           márcalo y ya no sale en el resumen ni en el Excel.
         </p>
         {diasClima.length === 0 ? (
@@ -348,9 +381,12 @@ export default function Incidencias({
                 <ul className="mt-1 divide-y divide-ink-100">
                   {g.ciudades.map((c) => (
                     <li key={c.ciudad} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                      <p className="text-sm text-ink-700">
-                        <span className="font-medium text-ink-900">{nombreCiudad(c.ciudad)}</span> · {detalleClima(c)}
-                      </p>
+                      <div>
+                        <p className="text-sm text-ink-700">
+                          <span className="font-medium text-ink-900">{nombreCiudad(c.ciudad)}</span> · {detalleClima(c)}
+                        </p>
+                        {impactoClima(c) && <p className="text-xs text-ink-500">{impactoClima(c)}</p>}
+                      </div>
                       <div className="flex items-center gap-3">
                         <NotaClima c={c} onGuardar={(nota) => actualizarClima(c, { nota })} />
                         <button
@@ -401,6 +437,8 @@ export default function Incidencias({
               </ul>
             )}
           </div>
+        )}
+        </>
         )}
       </div>
     </div>
