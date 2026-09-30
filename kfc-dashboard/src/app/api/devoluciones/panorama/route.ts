@@ -6,28 +6,35 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Panorama general de un periodo con la data de operaciones (igual que el panel principal). */
+function param(searchParams: URLSearchParams, key: string): string | null {
+  const v = searchParams.get(key);
+  return v && v !== "" ? v : null;
+}
+
+function arrayParam(searchParams: URLSearchParams, key: string): string[] | null {
+  const values = searchParams.getAll(key).filter(Boolean);
+  return values.length > 0 ? values : null;
+}
+
+/** Panorama de devoluciones y cancelaciones con la data de operaciones y
+ * los mismos filtros del panel principal (sin fechas = toda la data). */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const desde = searchParams.get("desde");
-  const hasta = searchParams.get("hasta");
-  if (!desde || !hasta) {
-    return NextResponse.json({ error: "Faltan las fechas desde y hasta." }, { status: 400 });
-  }
-  const lista = (k: string) => {
-    const v = searchParams.getAll(k).filter(Boolean);
-    return v.length ? v : null;
-  };
+  const orden_planeada = param(searchParams, "orden_planeada");
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await withRetryResult(() =>
     supabase.rpc("get_dev_panorama_ops", {
-      p_desde: desde,
-      p_hasta: hasta,
-      p_zonas: lista("zona"),
-      p_ciudades: lista("ciudad"),
-      p_tiendas: lista("tienda"),
-      p_repartidores: lista("repartidor"),
+      p_date_from: param(searchParams, "date_from"),
+      p_date_to: param(searchParams, "date_to"),
+      p_ciudad: arrayParam(searchParams, "ciudad"),
+      p_restaurant: arrayParam(searchParams, "restaurant"),
+      p_zona: arrayParam(searchParams, "zona"),
+      p_estatus: arrayParam(searchParams, "estatus"),
+      p_repartido_por: arrayParam(searchParams, "repartido_por"),
+      p_orden_planeada: orden_planeada === null ? null : orden_planeada === "true",
+      p_price_min: param(searchParams, "price_min"),
+      p_price_max: param(searchParams, "price_max"),
       p_incluir_returning: searchParams.get("returning") !== "0",
       p_incluir_rechazadas: searchParams.get("rechazadas") !== "0",
     })
@@ -36,5 +43,5 @@ export async function GET(req: Request) {
     console.error("Error en /api/devoluciones/panorama:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json(data, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  return NextResponse.json(data ?? {}, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }
