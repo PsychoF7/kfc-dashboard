@@ -19,14 +19,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Faltan week_start y week_end." }, { status: 400 });
   }
   try {
-    const { reporte, tendencia } = await obtenerReporte(weekStart, weekEnd, opciones);
+    const { reporte, tendencia, incidencias, clima } = await obtenerReporte(weekStart, weekEnd, opciones);
     if (!reporte?.resumen?.total) {
       return NextResponse.json(
         { error: "No hay data de tiempos cargada para esa semana." },
         { status: 404 }
       );
     }
-    const buffer = await construirExcelDevoluciones(reporte, tendencia, opciones);
+    const buffer = await construirExcelDevoluciones(reporte, tendencia, opciones, incidencias, clima);
     const nombre = `Reporte_KFC_-_${etiqueta(weekStart)}_-_${etiqueta(weekEnd)}.xlsx`;
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
