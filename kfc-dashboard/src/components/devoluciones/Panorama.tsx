@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
-import MultiSelectFilter from "@/components/MultiSelectFilter";
+import FiltersBar from "@/components/FiltersBar";
+import { DashboardFilters, EMPTY_FILTERS, FilterOptions } from "@/lib/types";
 import { META_DICIEMBRE, sumarDias } from "@/lib/devoluciones";
 import { colorPct, type MetricaMapa, type TiendaMapa } from "./MapaDevoluciones";
 
@@ -14,16 +15,13 @@ const MapaDevoluciones = dynamic(() => import("./MapaDevoluciones"), {
   loading: () => <div className="h-[420px] w-full animate-pulse rounded-lg bg-ink-50" />,
 });
 
-interface Filtros {
-  zonas: string[];
-  ciudades: string[];
-  tiendas: string[];
-  repartidores: string[];
+interface RangoData {
   fecha_min: string | null;
   fecha_max: string | null;
 }
 
 interface PanoramaData {
+  periodo: { desde: string; hasta: string };
   kpis: {
     total: number;
     devueltas: number;
@@ -67,8 +65,8 @@ const int = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleStr
 const money = (n: number | null | undefined) =>
   n == null ? "—" : `$${n.toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
 
-const inputFecha =
-  "rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
+const fechaCorta = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
 
 function comparacion(actual: number | null, anterior: number | null, hayAnterior: boolean) {
   if (!hayAnterior || actual == null || anterior == null) return undefined;
@@ -207,53 +205,55 @@ function Barra({ valor, max, color = "bg-brand-500" }: { valor: number; max: num
 // Panorama
 // ---------------------------------------------------------------------
 export default function Panorama() {
-  const [opciones, setOpciones] = useState<Filtros | null>(null);
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
-  const [zonas, setZonas] = useState<string[]>([]);
-  const [ciudades, setCiudades] = useState<string[]>([]);
-  const [tiendas, setTiendas] = useState<string[]>([]);
+  const [opciones, setOpciones] = useState<FilterOptions | null>(null);
+  const [rango, setRango] = useState<RangoData | null>(null);
+  // Mismos filtros que el panel principal; sin fechas = toda la data
+  const [filtros, setFiltros] = useState<DashboardFilters>(EMPTY_FILTERS);
   // Prendidos = mismo criterio que el panel principal
   const [incluirReturning, setIncluirReturning] = useState(true);
   const [incluirRechazadas, setIncluirRechazadas] = useState(true);
-  const [repartidores, setRepartidores] = useState<string[]>([]);
   const [data, setData] = useState<PanoramaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metrica, setMetrica] = useState<MetricaMapa>("dev");
   const [minOrdenes, setMinOrdenes] = useState(20);
 
-  // Opciones de filtro + periodo por defecto: las últimas 4 semanas con data
+  // Opciones de filtro (las mismas del panel principal) y el rango de fechas con data
   useEffect(() => {
+    fetch("/api/filters", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.error) throw new Error(res.error);
+        setOpciones(Array.isArray(res) ? res[0] ?? null : res);
+      })
+      .catch(() => setError("No se pudieron cargar las opciones de filtro."));
     fetch("/api/devoluciones/filtros", { cache: "no-store" })
       .then((r) => r.json())
-      .then((res: Filtros & { error?: string }) => {
-        if (res?.error) throw new Error(res.error);
-        setOpciones(res);
-        if (res.fecha_max) {
-          periodoInicial(res);
-        } else {
-          setLoading(false);
-        }
+      .then((res) => {
+        if (!res?.error) setRango({ fecha_min: res.fecha_min ?? null, fecha_max: res.fecha_max ?? null });
       })
-      .catch((e) => {
-        setError(e.message ?? "No se pudieron cargar los filtros.");
-        setLoading(false);
-      });
+      .catch(() => undefined);
   }, []);
 
   const query = useMemo(() => {
-    if (!desde || !hasta) return "";
-    const p = new URLSearchParams({ desde, hasta, returning: incluirReturning ? "1" : "0", rechazadas: incluirRechazadas ? "1" : "0" });
-    zonas.forEach((v) => p.append("zona", v));
-    ciudades.forEach((v) => p.append("ciudad", v));
-    tiendas.forEach((v) => p.append("tienda", v));
-    repartidores.forEach((v) => p.append("repartidor", v));
+    const f = filtros;
+    const p = new URLSearchParams();
+    if (f.date_from) p.set("date_from", f.date_from);
+    if (f.date_to) p.set("date_to", f.date_to);
+    f.ciudad.forEach((v) => p.append("ciudad", v));
+    f.restaurant.forEach((v) => p.append("restaurant", v));
+    f.zona.forEach((v) => p.append("zona", v));
+    f.estatus.forEach((v) => p.append("estatus", v));
+    f.repartido_por.forEach((v) => p.append("repartido_por", v));
+    if (f.orden_planeada) p.set("orden_planeada", f.orden_planeada);
+    if (f.price_min != null) p.set("price_min", String(f.price_min));
+    if (f.price_max != null) p.set("price_max", String(f.price_max));
+    p.set("returning", incluirReturning ? "1" : "0");
+    p.set("rechazadas", incluirRechazadas ? "1" : "0");
     return p.toString();
-  }, [desde, hasta, zonas, ciudades, tiendas, repartidores, incluirReturning, incluirRechazadas]);
+  }, [filtros, incluirReturning, incluirRechazadas]);
 
   useEffect(() => {
-    if (!query) return;
     const t = setTimeout(() => {
       setLoading(true);
       setError(null);
@@ -261,36 +261,24 @@ export default function Panorama() {
         .then((r) => r.json())
         .then((res) => {
           if (res?.error) throw new Error(res.error);
-          setData(res);
+          setData(res?.kpis ? res : null);
         })
         .catch((e) => setError(e.message ?? "No se pudo cargar el panorama."))
         .finally(() => setLoading(false));
-    }, 300);
+    }, 400);
     return () => clearTimeout(t);
   }, [query]);
 
-  /** Últimas 4 semanas con data (el periodo con el que abre la página). */
-  function periodoInicial(o: Filtros) {
-    if (!o.fecha_max) return;
-    const inicio = sumarDias(o.fecha_max, -27);
-    setHasta(o.fecha_max);
-    setDesde(o.fecha_min && o.fecha_min > inicio ? o.fecha_min : inicio);
-  }
-
   function limpiarFiltros() {
-    setZonas([]);
-    setCiudades([]);
-    setTiendas([]);
-    setRepartidores([]);
+    setFiltros(EMPTY_FILTERS);
     setIncluirReturning(true);
     setIncluirRechazadas(true);
-    if (opciones) periodoInicial(opciones);
   }
 
+  /** Atajos de periodo, contados hacia atrás desde el último día con data. */
   function preset(dias: number) {
-    if (!opciones?.fecha_max) return;
-    setHasta(opciones.fecha_max);
-    setDesde(sumarDias(opciones.fecha_max, -(dias - 1)));
+    if (!rango?.fecha_max) return;
+    setFiltros((f) => ({ ...f, date_from: sumarDias(rango.fecha_max!, -(dias - 1)), date_to: rango.fecha_max! }));
   }
 
   const k = data?.kpis;
@@ -305,16 +293,13 @@ export default function Panorama() {
   );
   const maxMotivo = Math.max(0, ...(data?.motivos ?? []).map((m) => m.ordenes));
   const maxZona = Math.max(0, ...(data?.zonas ?? []).map((z) => z.devueltas + z.canceladas));
-  const hayFiltros =
-    zonas.length + ciudades.length + tiendas.length + repartidores.length > 0 ||
-    !incluirReturning ||
-    !incluirRechazadas;
+
   const cargando = (v: string) => (loading ? "…" : v);
   const sinUbicacion = (data?.tiendas ?? []).filter(
     (t) => t.ordenes >= minOrdenes && (t.lat == null || t.lon == null)
   ).length;
 
-  if (opciones && !opciones.fecha_max) {
+  if (rango && !rango.fecha_max) {
     return (
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 text-sm text-ink-700 shadow-card">
         Todavía no hay data de operaciones cargada. Súbela en{" "}
@@ -326,59 +311,12 @@ export default function Panorama() {
 
   return (
     <div>
-      {/* Filtros */}
-      <div className="mt-6 rounded-xl border border-ink-100 bg-white p-4 shadow-card">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-ink-900">Filtros</h2>
-            <p className="text-xs text-ink-500">Data de operaciones, mismo criterio que el panel principal.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-ink-500">Rápido:</span>
-            {[
-              ["Última semana", 7],
-              ["4 semanas", 28],
-              ["3 meses", 91],
-            ].map(([l, d]) => (
-              <button
-                key={l as string}
-                onClick={() => preset(d as number)}
-                className="rounded-md border border-ink-200 px-2 py-1 font-medium text-ink-700 hover:bg-ink-50"
-              >
-                {l}
-              </button>
-            ))}
-            <button
-              onClick={limpiarFiltros}
-              className={clsx(
-                "ml-2 rounded-md px-2 py-1 font-medium",
-                hayFiltros ? "bg-brand-50 text-brand-700 hover:bg-brand-100" : "text-brand-600 hover:text-brand-700"
-              )}
-            >
-              Limpiar filtros
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-ink-500">Desde</label>
-            <input type="date" className={inputFecha} value={desde} onChange={(e) => setDesde(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-ink-500">Hasta</label>
-            <input type="date" className={inputFecha} value={hasta} onChange={(e) => setHasta(e.target.value)} />
-          </div>
-          <MultiSelectFilter label="Zona" items={opciones?.zonas ?? []} selected={zonas} onChange={setZonas} />
-          <MultiSelectFilter label="Ciudad" items={opciones?.ciudades ?? []} selected={ciudades} onChange={setCiudades} />
-          <MultiSelectFilter label="Tienda" items={opciones?.tiendas ?? []} selected={tiendas} onChange={setTiendas} />
-          <MultiSelectFilter
-            label="Repartido por"
-            items={opciones?.repartidores ?? []}
-            selected={repartidores}
-            onChange={setRepartidores}
-          />
-        </div>
-        <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-ink-100 pt-3 text-sm">
+      {/* Filtros: los mismos del panel principal */}
+      <div className="mt-6">
+        <FiltersBar options={opciones} filters={filtros} onChange={setFiltros} onClear={limpiarFiltros} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-8 gap-y-3 rounded-xl border border-ink-100 bg-white px-4 py-3 text-sm shadow-card">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <label className="flex cursor-pointer items-center gap-2 text-ink-700">
             <input
               type="checkbox"
@@ -397,9 +335,34 @@ export default function Panorama() {
             />
             Contar rechazadas como canceladas
           </label>
-          <span className="text-xs text-ink-500">Solo aplica a este panorama.</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-ink-500">Periodo rápido:</span>
+          {[
+            ["Última semana", 7],
+            ["4 semanas", 28],
+            ["3 meses", 91],
+          ].map(([l, d]) => (
+            <button
+              key={l as string}
+              onClick={() => preset(d as number)}
+              disabled={!rango?.fecha_max}
+              className="rounded-md border border-ink-200 px-2 py-1 font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-40"
+            >
+              {l}
+            </button>
+          ))}
         </div>
       </div>
+      <p className="mt-2 text-xs text-ink-500">
+        Data de operaciones, mismo criterio que el panel principal
+        {data?.periodo
+          ? ` · mostrando del ${fechaCorta(data.periodo.desde)} al ${fechaCorta(data.periodo.hasta)}${
+              filtros.date_from || filtros.date_to ? "" : " (toda la data)"
+            }`
+          : ""}
+        .
+      </p>
 
       {error && (
         <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
