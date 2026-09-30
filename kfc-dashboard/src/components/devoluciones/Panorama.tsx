@@ -6,7 +6,16 @@ import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
 import FiltersBar from "@/components/FiltersBar";
 import { DashboardFilters, EMPTY_FILTERS, FilterOptions } from "@/lib/types";
-import { META_DICIEMBRE, sumarDias } from "@/lib/devoluciones";
+import {
+  META_DICIEMBRE,
+  ClimaDia,
+  Incidencia,
+  TIPOS_INCIDENCIA,
+  detalleClima,
+  nombreCiudad,
+  sumarDias,
+} from "@/lib/devoluciones";
+import Incidencias from "./Incidencias";
 import { colorPct, type MetricaMapa, type TiendaMapa } from "./MapaDevoluciones";
 
 // Leaflet solo corre en el navegador
@@ -77,7 +86,15 @@ function comparacion(actual: number | null, anterior: number | null, hayAnterior
 // ---------------------------------------------------------------------
 // Gráfica por día (líneas de % con la meta y detalle al pasar el mouse)
 // ---------------------------------------------------------------------
-function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
+function GraficaDiaria({
+  datos,
+  incidencias,
+  clima,
+}: {
+  datos: PanoramaData["por_dia"];
+  incidencias: Incidencia[];
+  clima: ClimaDia[];
+}) {
   const [hover, setHover] = useState<number | null>(null);
   if (datos.length < 2) {
     return <p className="text-xs text-ink-500">Elige un periodo de al menos 2 días para ver la tendencia.</p>;
@@ -101,9 +118,15 @@ function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
     const [, m, d] = iso.split("-").map(Number);
     return `${d}/${m}`;
   };
-  const diaSemana = (iso: string) =>
-    new Date(iso + "T00:00:00").toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+  const diaSemana = (iso: string) => {
+    const t = new Date(iso + "T00:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "short" });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
   const sel = hover != null ? datos[hover] : null;
+  const delDia = (dia: string) => incidencias.filter((x) => x.fecha_inicio <= dia && x.fecha_fin >= dia);
+  const climaDelDia = (dia: string) => clima.filter((c) => c.fecha === dia && !c.descartado);
+  const incSel = sel ? delDia(sel.dia) : [];
+  const climaSel = sel ? climaDelDia(sel.dia) : [];
 
   return (
     <div className="relative">
@@ -120,6 +143,30 @@ function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
             <stop offset="100%" stopColor="#891DFF" stopOpacity="0" />
           </linearGradient>
         </defs>
+        {/* Días con incidencia (van al fondo, detrás de la cuadrícula y las líneas) */}
+        {datos.map((d, i) => {
+          const inc = delDia(d.dia);
+          const cli = climaDelDia(d.dia);
+          if (inc.length === 0 && cli.length === 0) return null;
+          // Franja amarilla solo para incidencias registradas; el clima automático
+          // se marca solo con su ícono (en temporada de lluvias casi siempre llueve en alguna ciudad).
+          return (
+            <g key={`inc-${d.dia}`}>
+              {inc.length > 0 && (
+              <rect
+                x={Math.max(pad.l, x(i) - paso / 2)}
+                y={pad.t}
+                width={Math.min(paso, W - pad.r - Math.max(pad.l, x(i) - paso / 2))}
+                height={H - pad.t - pad.b}
+                fill="#FFF4D6"
+              />
+              )}
+              <text x={x(i)} y={pad.t + 12} textAnchor="middle" fontSize="11">
+                {inc.length > 0 ? TIPOS_INCIDENCIA[inc[0].tipo]?.icono ?? "📝" : "🌧️"}
+              </text>
+            </g>
+          );
+        })}
         {ticks.map((t) => (
           <g key={t}>
             <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#E9EAF2" />
@@ -160,12 +207,12 @@ function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
       </svg>
       {sel && hover != null && (
         <div
-          className="pointer-events-none absolute top-2 z-10 w-52 rounded-lg border border-ink-100 bg-white p-3 text-xs shadow-card"
+          className="pointer-events-none absolute top-2 z-10 w-60 rounded-lg border border-ink-100 bg-white p-3 text-xs shadow-card"
           style={{
             left: `${Math.min(Math.max((x(hover) / W) * 100, 12), 70)}%`,
           }}
         >
-          <p className="font-semibold capitalize text-ink-900">{diaSemana(sel.dia)}</p>
+          <p className="font-semibold text-ink-900">{diaSemana(sel.dia)}</p>
           <p className="mt-1 text-ink-700">
             <span className="font-medium text-brand-600">{pct(sel.pct_dev)}</span> devolución ·{" "}
             {int(sel.devueltas)} órdenes
@@ -175,6 +222,22 @@ function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
             {int(sel.canceladas)} órdenes
           </p>
           <p className="mt-1 text-ink-500">{int(sel.total)} órdenes en total</p>
+          {incSel.map((x) => (
+            <p key={x.id} className="mt-1.5 border-t border-ink-100 pt-1.5 text-ink-700">
+              {TIPOS_INCIDENCIA[x.tipo]?.icono} <span className="font-medium">{TIPOS_INCIDENCIA[x.tipo]?.label}</span>:{" "}
+              {x.descripcion}
+            </p>
+          ))}
+          {climaSel.length > 0 && (
+            <p className="mt-1.5 border-t border-ink-100 pt-1.5 text-ink-700">
+              🌧️ <span className="font-medium">Mal clima:</span>{" "}
+              {climaSel
+                .slice(0, 4)
+                .map((c) => `${nombreCiudad(c.ciudad)} (${detalleClima(c)})`)
+                .join("; ")}
+              {climaSel.length > 4 ? ` y ${climaSel.length - 4} más` : ""}
+            </p>
+          )}
         </div>
       )}
       <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
@@ -187,6 +250,12 @@ function GraficaDiaria({ datos }: { datos: PanoramaData["por_dia"] }) {
         <span className="flex items-center gap-1.5">
           <span className="h-0 w-4 border-t-2 border-dashed border-success" /> Meta de diciembre
         </span>
+        {incidencias.length > 0 && (
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-4 rounded-sm bg-[#FFF4D6] ring-1 ring-[#F0D48A]" /> Día con incidencia registrada
+          </span>
+        )}
+        {clima.some((c) => !c.descartado) && <span>🌧️ Mal clima en alguna ciudad (automático)</span>}
       </div>
     </div>
   );
@@ -216,6 +285,10 @@ export default function Panorama() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [metrica, setMetrica] = useState<MetricaMapa>("dev");
+  const [incidencias, setIncidencias] = useState<Incidencia[]>([]);
+  const [recargarInc, setRecargarInc] = useState(0);
+  const [clima, setClima] = useState<ClimaDia[]>([]);
+  const [recargarClima, setRecargarClima] = useState(0);
   const [minOrdenes, setMinOrdenes] = useState(20);
 
   // Opciones de filtro (las mismas del panel principal) y el rango de fechas con data
@@ -268,6 +341,32 @@ export default function Panorama() {
     }, 400);
     return () => clearTimeout(t);
   }, [query]);
+
+  // Incidencias que tocan el periodo que se está mostrando
+  const periodoDesde = data?.periodo?.desde;
+  const periodoHasta = data?.periodo?.hasta;
+  useEffect(() => {
+    if (!periodoDesde || !periodoHasta) return;
+    fetch(`/api/devoluciones/incidencias?desde=${periodoDesde}&hasta=${periodoHasta}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => setIncidencias(res?.incidencias ?? []))
+      .catch(() => setIncidencias([]));
+  }, [periodoDesde, periodoHasta, recargarInc]);
+
+  // Mal clima detectado automáticamente en el periodo (si faltan días, se consultan solos)
+  useEffect(() => {
+    if (!periodoDesde || !periodoHasta) return;
+    fetch(`/api/devoluciones/clima?desde=${periodoDesde}&hasta=${periodoHasta}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => setClima(res?.clima ?? []))
+      .catch(() => setClima([]));
+  }, [periodoDesde, periodoHasta, recargarClima]);
+
+  // Si filtras por ciudad, solo cuenta el clima de esas ciudades
+  const climaVisible = useMemo(
+    () => (filtros.ciudad.length ? clima.filter((c) => filtros.ciudad.includes(c.ciudad)) : clima),
+    [clima, filtros.ciudad]
+  );
 
   function limpiarFiltros() {
     setFiltros(EMPTY_FILTERS);
@@ -413,8 +512,23 @@ export default function Panorama() {
         <h2 className="text-sm font-semibold text-ink-900">Tendencia por día</h2>
         <p className="mt-1 text-xs text-ink-500">Pasa el mouse sobre la gráfica para ver el detalle de cada día.</p>
         <div className="mt-3">
-          {data ? <GraficaDiaria datos={data.por_dia} /> : <div className="h-60 animate-pulse rounded-lg bg-ink-50" />}
+          {data ? (
+            <GraficaDiaria datos={data.por_dia} incidencias={incidencias} clima={climaVisible} />
+          ) : (
+            <div className="h-60 animate-pulse rounded-lg bg-ink-50" />
+          )}
         </div>
+      </div>
+
+      {/* Incidencias y contexto */}
+      <div className="mt-6">
+        <Incidencias
+          incidencias={incidencias}
+          clima={climaVisible}
+          opciones={opciones}
+          onCambio={() => setRecargarInc((n) => n + 1)}
+          onClimaCambio={() => setRecargarClima((n) => n + 1)}
+        />
       </div>
 
       {/* Mapa + top tiendas */}
