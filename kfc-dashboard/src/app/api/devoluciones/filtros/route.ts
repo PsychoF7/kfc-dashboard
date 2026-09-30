@@ -5,10 +5,10 @@ import { withRetryResult } from "@/lib/supabase/retry";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Estados, tiendas, repartidores y el rango de fechas que ya tiene data. */
+/** Zonas, ciudades, tiendas, repartidores y el rango de fechas de la data de operaciones. */
 export async function GET() {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await withRetryResult(() => supabase.rpc("get_dev_filtros"));
+  const { data, error } = await withRetryResult(() => supabase.rpc("get_dev_filtros_ops"));
   if (error) {
     console.error("Error en /api/devoluciones/filtros:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
