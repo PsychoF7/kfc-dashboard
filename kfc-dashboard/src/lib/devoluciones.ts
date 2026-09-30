@@ -349,3 +349,144 @@ export function criterioTexto(op: DevOpciones) {
   const canc = op.incluirRechazadas ? "CANCELLED + REJECTED" : "CANCELLED";
   return `Criterio: devoluciones = ${dev}; cancelaciones = ${canc}; % sobre el total de ordenes de la semana.`;
 }
+
+// ---------------------------------------------------------------------
+// Incidencias y contexto (mal clima, tráfico, intermitencias, bugs...)
+// ---------------------------------------------------------------------
+export type TipoIncidencia = "clima" | "trafico" | "intermitencia" | "bug" | "evento" | "otro";
+export type AlcanceIncidencia = "general" | "zona" | "ciudad" | "tienda";
+
+export interface Incidencia {
+  id: string;
+  tipo: TipoIncidencia;
+  fecha_inicio: string;
+  fecha_fin: string;
+  alcance: AlcanceIncidencia;
+  alcance_valores: string[];
+  descripcion: string;
+}
+
+export const TIPOS_INCIDENCIA: Record<TipoIncidencia, { label: string; icono: string }> = {
+  clima: { label: "Mal clima", icono: "🌧️" },
+  trafico: { label: "Tráfico", icono: "🚦" },
+  intermitencia: { label: "Intermitencia / falla de sistema", icono: "⚡" },
+  bug: { label: "Bug", icono: "🐞" },
+  evento: { label: "Evento local (marchas, partidos, bloqueos)", icono: "📍" },
+  otro: { label: "Otro", icono: "📝" },
+};
+
+export const ALCANCES_INCIDENCIA: Record<AlcanceIncidencia, string> = {
+  general: "Todas las tiendas",
+  zona: "Zona",
+  ciudad: "Ciudad",
+  tienda: "Tienda",
+};
+
+/** "22 sep" o "22-24 sep" o "30 sep - 2 oct" */
+export function fechasIncidencia(i: Incidencia) {
+  if (i.fecha_inicio === i.fecha_fin) {
+    const { m, d } = partes(i.fecha_inicio);
+    return `${d} ${MESES_CORTOS[m]}`;
+  }
+  return rangoCorto(i.fecha_inicio, i.fecha_fin);
+}
+
+/** "Todas las tiendas" / "Acapulco" / "3 tiendas: A, B, C" */
+export function alcanceIncidencia(i: Incidencia) {
+  if (i.alcance === "general" || i.alcance_valores.length === 0) return ALCANCES_INCIDENCIA.general;
+  const v = i.alcance_valores;
+  if (v.length <= 3) return v.join(", ");
+  return `${v.length} ${i.alcance === "tienda" ? "tiendas" : i.alcance === "zona" ? "zonas" : "ciudades"}: ${v
+    .slice(0, 3)
+    .join(", ")}…`;
+}
+
+/** Una línea para el resumen y el Excel:
+ * "22-24 sep · 🌧️ Mal clima · Acapulco: Tormenta tropical, varias tiendas cerradas." */
+export function lineaIncidencia(i: Incidencia) {
+  const t = TIPOS_INCIDENCIA[i.tipo] ?? TIPOS_INCIDENCIA.otro;
+  return `${fechasIncidencia(i)} · ${t.icono} ${t.label} · ${alcanceIncidencia(i)}: ${i.descripcion}`;
+}
+
+/** ¿La incidencia cae (aunque sea un día) dentro del rango? */
+export function incidenciaEnRango(i: Incidencia, desde: string, hasta: string) {
+  return i.fecha_inicio <= hasta && i.fecha_fin >= desde;
+}
+
+// ---------------------------------------------------------------------
+// Clima detectado automáticamente (Open-Meteo)
+// ---------------------------------------------------------------------
+export interface ClimaDia {
+  ciudad: string;
+  fecha: string;
+  lluvia_mm: number | null;
+  codigo: number | null;
+  rafaga_kmh: number | null;
+  nota: string | null;
+  descartado: boolean;
+}
+
+/** Criterio de "mal clima" (el mismo en el servidor y en pantalla):
+ *  lluvia fuerte (15 mm o más), tormenta eléctrica con 10 mm o más,
+ *  o ráfagas de viento de 60 km/h o más. */
+export const UMBRALES_CLIMA = { lluvia_mm: 15, tormenta_lluvia_mm: 10, rafaga_kmh: 60 };
+
+export function esMalClima(lluvia: number | null, codigo: number | null, rafaga: number | null) {
+  const l = lluvia ?? 0;
+  const tormenta = (codigo ?? 0) >= 95;
+  return (
+    l >= UMBRALES_CLIMA.lluvia_mm ||
+    (tormenta && l >= UMBRALES_CLIMA.tormenta_lluvia_mm) ||
+    (rafaga ?? 0) >= UMBRALES_CLIMA.rafaga_kmh
+  );
+}
+
+/** "44 mm de lluvia, tormenta eléctrica, ráfagas de 63 km/h" */
+export function detalleClima(c: ClimaDia) {
+  const partesTxt: string[] = [];
+  if (c.lluvia_mm != null && c.lluvia_mm >= 1) {
+    const mm = Math.round(c.lluvia_mm);
+    partesTxt.push(`${mm} mm de lluvia${mm >= 30 ? " (muy fuerte)" : ""}`);
+  }
+  if ((c.codigo ?? 0) >= 95) partesTxt.push("tormenta eléctrica");
+  if ((c.rafaga_kmh ?? 0) >= 50) partesTxt.push(`ráfagas de ${Math.round(c.rafaga_kmh!)} km/h`);
+  return partesTxt.join(", ") || "mal clima";
+}
+
+const titulo = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/(^|\s)\S/g, (l) => l.toUpperCase());
+
+export function nombreCiudad(c: string) {
+  return titulo(c);
+}
+
+/** Agrupa por día los registros de mal clima que no se descartaron. */
+export function climaPorDia(clima: ClimaDia[]) {
+  const mapa = new Map<string, ClimaDia[]>();
+  clima
+    .filter((c) => !c.descartado)
+    .forEach((c) => {
+      const l = mapa.get(c.fecha) ?? [];
+      l.push(c);
+      mapa.set(c.fecha, l);
+    });
+  return Array.from(mapa.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([fecha, ciudades]) => ({
+      fecha,
+      ciudades: ciudades.sort((a, b) => (b.lluvia_mm ?? 0) - (a.lluvia_mm ?? 0)),
+    }));
+}
+
+/** Una línea por día para el resumen y el Excel:
+ * "23 sep · 🌧️ Mal clima (detectado automáticamente) · Acapulco: 44 mm de lluvia, tormenta eléctrica (nota: …)" */
+export function lineaClimaDia(fecha: string, ciudades: ClimaDia[]) {
+  const { m, d } = partes(fecha);
+  const detalle = ciudades
+    .map((c) => `${nombreCiudad(c.ciudad)}: ${detalleClima(c)}${c.nota ? ` (nota: ${c.nota})` : ""}`)
+    .join("; ");
+  return `${d} ${MESES_CORTOS[m]} · 🌧️ Mal clima (detectado automáticamente) · ${detalle}`;
+}
