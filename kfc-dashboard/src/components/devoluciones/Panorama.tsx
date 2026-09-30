@@ -437,20 +437,14 @@ export default function Panorama() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-ink-500">Periodo rápido:</span>
-          {[
-            ["Última semana", 7],
-            ["4 semanas", 28],
-            ["3 meses", 91],
-          ].map(([l, d]) => (
-            <button
-              key={l as string}
-              onClick={() => preset(d as number)}
-              disabled={!rango?.fecha_max}
-              className="rounded-md border border-ink-200 px-2 py-1 font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-40"
-            >
-              {l}
-            </button>
-          ))}
+          <button
+            onClick={() => preset(7)}
+            disabled={!rango?.fecha_max}
+            title="Los últimos 7 días que tienen data cargada"
+            className="rounded-md border border-ink-200 px-2 py-1 font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-40"
+          >
+            Última semana
+          </button>
         </div>
       </div>
       <p className="mt-2 text-xs text-ink-500">
