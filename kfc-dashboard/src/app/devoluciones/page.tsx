@@ -8,8 +8,16 @@ import {
   META_DICIEMBRE,
   DevGrupo,
   DevReporte,
+  ClimaDia,
   DevSemanaTendencia,
+  Incidencia,
+  climaPorDia,
+  detalleClima,
+  nombreCiudad,
+  TIPOS_INCIDENCIA,
   TipoDuplicado,
+  alcanceIncidencia,
+  fechasIncidencia,
   esAlerta,
   mapsUrl,
   nombreMes,
@@ -357,6 +365,8 @@ export default function DevolucionesPage() {
   const [anchorDate, setAnchorDate] = useState(semanaPasada);
   const [reporte, setReporte] = useState<DevReporte | null>(null);
   const [tendencia, setTendencia] = useState<DevSemanaTendencia[]>([]);
+  const [incidenciasSemana, setIncidenciasSemana] = useState<Incidencia[]>([]);
+  const [climaSemana, setClimaSemana] = useState<ClimaDia[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState(false);
@@ -379,6 +389,8 @@ export default function DevolucionesPage() {
         if (res?.error) throw new Error(res.error);
         setReporte(res.reporte);
         setTendencia(res.tendencia ?? []);
+        setIncidenciasSemana(res.incidencias ?? []);
+        setClimaSemana(res.clima ?? []);
       })
       .catch((e) => setError(e.message ?? "No se pudo cargar el análisis."))
       .finally(() => setLoading(false));
@@ -511,6 +523,35 @@ export default function DevolucionesPage() {
                   <li key={l}>{l}</li>
                 ))}
               </ul>
+              {(incidenciasSemana.length > 0 || climaPorDia(climaSemana).length > 0) && (
+                <div className="mt-4 rounded-lg bg-[#FFF4D6] p-3">
+                  <p className="text-xs font-semibold text-ink-900">Contexto de la semana</p>
+                  <ul className="mt-1.5 space-y-1.5 text-xs text-ink-700">
+                    {incidenciasSemana.map((x) => (
+                      <li key={x.id}>
+                        {TIPOS_INCIDENCIA[x.tipo]?.icono}{" "}
+                        <span className="font-medium">
+                          {TIPOS_INCIDENCIA[x.tipo]?.label} · {fechasIncidencia(x)} · {alcanceIncidencia(x)}:
+                        </span>{" "}
+                        {x.descripcion}
+                      </li>
+                    ))}
+                    {climaPorDia(climaSemana).map((g) => (
+                      <li key={g.fecha}>
+                        🌧️{" "}
+                        <span className="font-medium">
+                          Mal clima (automático) ·{" "}
+                          {new Date(g.fecha + "T00:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" })}:
+                        </span>{" "}
+                        {g.ciudades
+                          .map((c) => `${nombreCiudad(c.ciudad)} (${detalleClima(c)}${c.nota ? `; nota: ${c.nota}` : ""})`)
+                          .join("; ")}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-[11px] text-ink-500">También sale en la hoja Resumen del Excel.</p>
+                </div>
+              )}
             </Card>
             <Card className="lg:col-span-3">
               <h2 className="text-sm font-semibold text-ink-900">% por semana (últimas 12)</h2>
