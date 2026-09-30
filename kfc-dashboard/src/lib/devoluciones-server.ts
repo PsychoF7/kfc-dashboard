@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
-import type { DevOpciones, DevReporte, DevSemanaTendencia } from "@/lib/devoluciones";
+import type { DevOpciones, DevReporte, DevSemanaTendencia, Incidencia } from "@/lib/devoluciones";
+import { sincronizarClima } from "@/lib/clima";
 
 /** Lee semana y switches de la URL (?week_start=&week_end=&returning=1&rechazadas=1). */
 export function leerParametros(req: Request) {
@@ -14,10 +15,11 @@ export function leerParametros(req: Request) {
   return { weekStart, weekEnd, opciones };
 }
 
-/** Trae el reporte de la semana y la tendencia de las últimas 12 semanas. */
+/** Trae el reporte de la semana, la tendencia de las últimas 12 semanas y
+ * las incidencias (clima, tráfico, fallas...) que tocan esa semana. */
 export async function obtenerReporte(weekStart: string, weekEnd: string, op: DevOpciones) {
   const supabase = getSupabaseAdmin();
-  const [rep, tend] = await Promise.all([
+  const [rep, tend, inc, clima] = await Promise.all([
     withRetryResult(() =>
       supabase.rpc("get_dev_reporte", {
         p_week_start: weekStart,
@@ -34,11 +36,23 @@ export async function obtenerReporte(weekStart: string, weekEnd: string, op: Dev
         p_incluir_rechazadas: op.incluirRechazadas,
       })
     ),
+    withRetryResult(() =>
+      supabase
+        .from("dev_incidencias")
+        .select("id, tipo, fecha_inicio, fecha_fin, alcance, alcance_valores, descripcion")
+        .lte("fecha_inicio", weekEnd)
+        .gte("fecha_fin", weekStart)
+        .order("fecha_inicio", { ascending: true })
+    ),
+    sincronizarClima(supabase, weekStart, weekEnd),
   ]);
   if (rep.error) throw new Error(rep.error.message);
   if (tend.error) throw new Error(tend.error.message);
   return {
     reporte: rep.data as DevReporte,
     tendencia: (tend.data ?? []) as DevSemanaTendencia[],
+    // Si la tabla de incidencias no existe todavía, el reporte sale igual
+    incidencias: (inc.error ? [] : inc.data ?? []) as Incidencia[],
+    clima,
   };
 }
