@@ -1,7 +1,8 @@
 /** Reintenta una llamada a Supabase si falla por una razón transitoria:
  * problemas de red (ECONNRESET/"fetch failed") o un timeout de consulta
  * (57014 - statement timeout, común en momentos de carga en el plan
- * gratuito). No son errores de la app — es la infraestructura teniendo
+ * gratuito) o un desfase de reloj de Supabase ("JWT issued at future"),
+ * que se corrige solo en uno o dos segundos. No son errores de la app — es la infraestructura teniendo
  * un hipo momentáneo, así que vale la pena intentarlo de nuevo antes de
  * mostrarle un error a la persona. */
 export async function withRetry<T>(
@@ -17,7 +18,7 @@ export async function withRetry<T>(
       lastErr = err;
       const anyErr = err as any;
       const msg = `${anyErr?.message ?? ""} ${anyErr?.code ?? ""} ${String(anyErr?.cause ?? "")}`;
-      const isTransient = /fetch failed|ECONNRESET|ETIMEDOUT|UND_ERR|57014|statement timeout/i.test(
+      const isTransient = /fetch failed|ECONNRESET|ETIMEDOUT|UND_ERR|57014|statement timeout|JWT issued at future|PGRST303/i.test(
         msg
       );
       if (!isTransient || attempt === retries - 1) throw err;
@@ -40,7 +41,7 @@ export async function withRetryResult<T>(
     const result = await fn();
     if (!result.error) return result;
     const msg = `${result.error?.message ?? ""} ${result.error?.code ?? ""}`;
-    const isTransient = /fetch failed|ECONNRESET|ETIMEDOUT|UND_ERR|57014|statement timeout/i.test(
+    const isTransient = /fetch failed|ECONNRESET|ETIMEDOUT|UND_ERR|57014|statement timeout|JWT issued at future|PGRST303/i.test(
       msg
     );
     last = result;
