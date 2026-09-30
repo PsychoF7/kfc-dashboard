@@ -13,15 +13,13 @@ export interface TiendaMapa {
   canceladas: number;
   monto_devuelto: number;
   pct_dev: number;
+  pct_canc: number;
   pct_problema: number;
 }
 
-// [lat, lon, tienda, fecha, id corto, monto]
-export type PuntoMapa = [number, number, string, string, string, number];
+export type MetricaMapa = "dev" | "canc";
 
-export type ModoMapa = "tiendas" | "ordenes";
-
-/** Color según % de devolución (verde = dentro de la meta, rojo = muy alto). */
+/** Color según el % (verde = dentro de la meta del 2%, rojo = muy alto). */
 export function colorPct(p: number) {
   if (p <= 0.02) return "#1F8A54";
   if (p <= 0.05) return "#E0B000";
@@ -36,13 +34,11 @@ const esc = (s: string) =>
 
 export default function MapaDevoluciones({
   tiendas,
-  puntos,
-  modo,
+  metrica,
   minOrdenes,
 }: {
   tiendas: TiendaMapa[];
-  puntos: PuntoMapa[];
-  modo: ModoMapa;
+  metrica: MetricaMapa;
   minOrdenes: number;
 }) {
   const contenedor = useRef<HTMLDivElement>(null);
@@ -56,7 +52,9 @@ export default function MapaDevoluciones({
     import("leaflet").then((mod) => {
       if (cancelado || !contenedor.current || mapa.current) return;
       L.current = mod;
-      const m = mod.map(contenedor.current, { preferCanvas: true, scrollWheelZoom: false }).setView([21.5, -101.5], 5);
+      const m = mod
+        .map(contenedor.current, { preferCanvas: true, scrollWheelZoom: false })
+        .setView([21.5, -101.5], 5);
       mod
         .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -79,7 +77,7 @@ export default function MapaDevoluciones({
   useEffect(() => {
     dibujar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tiendas, puntos, modo, minOrdenes]);
+  }, [tiendas, metrica, minOrdenes]);
 
   function dibujar() {
     const mod = L.current;
@@ -89,46 +87,35 @@ export default function MapaDevoluciones({
     g.clearLayers();
     const limites: [number, number][] = [];
 
-    if (modo === "tiendas") {
-      const conCoords = tiendas.filter((t) => t.lat != null && t.lon != null && t.ordenes >= minOrdenes);
-      const maxDev = Math.max(1, ...conCoords.map((t) => t.devueltas));
-      // las más chicas arriba para que no queden tapadas
-      [...conCoords]
-        .sort((a, b) => b.devueltas - a.devueltas)
-        .forEach((t) => {
-          const radio = 5 + 22 * Math.sqrt(t.devueltas / maxDev);
-          mod
-            .circleMarker([t.lat!, t.lon!], {
-              radius: radio,
-              color: "#fff",
-              weight: 1,
-              fillColor: colorPct(t.pct_dev),
-              fillOpacity: 0.8,
-            })
-            .bindPopup(
-              `<strong>${esc(t.tienda)}</strong><br/>` +
-                `${t.devueltas.toLocaleString("es-MX")} devueltas de ${t.ordenes.toLocaleString("es-MX")} órdenes (${pct(t.pct_dev)})<br/>` +
-                `${t.canceladas.toLocaleString("es-MX")} canceladas · problema total ${pct(t.pct_problema)}<br/>` +
-                `Monto devuelto: ${money(t.monto_devuelto)}`
-            )
-            .bindTooltip(`${esc(t.tienda)}: ${pct(t.pct_dev)}`)
-            .addTo(g);
-          limites.push([t.lat!, t.lon!]);
-        });
-    } else {
-      puntos.forEach(([lat, lon, tienda, fecha, id, monto]) => {
+    const conCoords = tiendas.filter((t) => t.lat != null && t.lon != null && t.ordenes >= minOrdenes);
+    const valor = (t: TiendaMapa) => (metrica === "dev" ? t.devueltas : t.canceladas);
+    const porcentaje = (t: TiendaMapa) => (metrica === "dev" ? t.pct_dev : t.pct_canc);
+    const maxV = Math.max(1, ...conCoords.map(valor));
+
+    // las más grandes primero, para que las chicas queden encima y se puedan tocar
+    [...conCoords]
+      .sort((a, b) => valor(b) - valor(a))
+      .forEach((t) => {
+        const radio = 5 + 22 * Math.sqrt(valor(t) / maxV);
         mod
-          .circleMarker([lat, lon], {
-            radius: 4,
-            stroke: false,
-            fillColor: "#D63A3A",
-            fillOpacity: 0.45,
+          .circleMarker([t.lat!, t.lon!], {
+            radius: radio,
+            color: "#fff",
+            weight: 1,
+            fillColor: colorPct(porcentaje(t)),
+            fillOpacity: 0.8,
           })
-          .bindPopup(`<strong>${esc(tienda)}</strong><br/>${esc(fecha)} · ${esc(id)}<br/>${money(monto)}`)
+          .bindPopup(
+            `<strong>${esc(t.tienda)}</strong><br/>` +
+              `${t.ordenes.toLocaleString("es-MX")} órdenes<br/>` +
+              `${t.devueltas.toLocaleString("es-MX")} devueltas (${pct(t.pct_dev)}) · ${money(t.monto_devuelto)}<br/>` +
+              `${t.canceladas.toLocaleString("es-MX")} canceladas (${pct(t.pct_canc)})<br/>` +
+              `Problema total: ${pct(t.pct_problema)}`
+          )
+          .bindTooltip(`${esc(t.tienda)}: ${pct(porcentaje(t))}`)
           .addTo(g);
-        limites.push([lat, lon]);
+        limites.push([t.lat!, t.lon!]);
       });
-    }
 
     if (limites.length > 0) m.fitBounds(limites, { padding: [24, 24], maxZoom: 12 });
   }
@@ -137,12 +124,12 @@ export default function MapaDevoluciones({
     <>
       {/* Mapa base en tonos suaves para que resalten los círculos */}
       <style>{`.mapa-base-gris { filter: grayscale(0.85) brightness(1.04) contrast(0.95); }`}</style>
-    <div
-      ref={contenedor}
-      className="h-[420px] w-full overflow-hidden rounded-lg border border-ink-100"
-      role="region"
-      aria-label="Mapa de devoluciones"
-    />
+      <div
+        ref={contenedor}
+        className="h-[420px] w-full overflow-hidden rounded-lg border border-ink-100"
+        role="region"
+        aria-label="Mapa de devoluciones y cancelaciones por tienda"
+      />
     </>
   );
 }
