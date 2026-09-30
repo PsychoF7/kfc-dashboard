@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { withRetryResult } from "@/lib/supabase/retry";
-import { esMalClima, sumarDias, type ClimaDia } from "@/lib/devoluciones";
+import { climaRelevante, esMalClima, sumarDias, type ClimaDia } from "@/lib/devoluciones";
 
 // Consulta del clima histórico por ciudad con Open-Meteo (gratis, sin clave).
 // Se guarda en la tabla dev_clima para no volver a consultar los mismos días.
@@ -35,7 +35,8 @@ async function pedirOpenMeteo(ciudades: Ciudad[], desde: string, hasta: string) 
 }
 
 /** Se asegura de tener el clima de cada ciudad para cada día del rango
- * (solo días ya terminados) y regresa los días de mal clima. */
+ * (solo días ya terminados) y regresa los días de mal clima que son
+ * relevantes: ciudades con suficientes órdenes ese día. */
 export async function sincronizarClima(
   supabase: SupabaseClient,
   desde: string,
@@ -97,19 +98,20 @@ export async function sincronizarClima(
     }
   }
 
+  // Mal clima + órdenes de esa ciudad ese día (data de operaciones)
   const { data, error } = await withRetryResult(() =>
-    supabase
-      .from("dev_clima")
-      .select("ciudad, fecha, lluvia_mm, codigo, rafaga_kmh, nota, descartado")
-      .eq("malo", true)
-      .gte("fecha", desde)
-      .lte("fecha", hasta)
-      .order("fecha", { ascending: true })
+    supabase.rpc("get_dev_clima", { p_desde: desde, p_hasta: hasta })
   );
   if (error) return [];
-  return (data ?? []).map((r: any) => ({
-    ...r,
-    lluvia_mm: r.lluvia_mm == null ? null : Number(r.lluvia_mm),
-    rafaga_kmh: r.rafaga_kmh == null ? null : Number(r.rafaga_kmh),
-  })) as ClimaDia[];
+  return ((data ?? []) as any[])
+    .map((r) => ({
+      ...r,
+      lluvia_mm: r.lluvia_mm == null ? null : Number(r.lluvia_mm),
+      rafaga_kmh: r.rafaga_kmh == null ? null : Number(r.rafaga_kmh),
+      ordenes: Number(r.ordenes ?? 0),
+      devueltas: Number(r.devueltas ?? 0),
+      canceladas: Number(r.canceladas ?? 0),
+      pct_del_dia: Number(r.pct_del_dia ?? 0),
+    }))
+    .filter((c) => climaRelevante(c as ClimaDia)) as ClimaDia[];
 }
