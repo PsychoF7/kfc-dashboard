@@ -424,12 +424,34 @@ export interface ClimaDia {
   rafaga_kmh: number | null;
   nota: string | null;
   descartado: boolean;
+  /** Órdenes KFC de esa ciudad ese día (data de operaciones) */
+  ordenes?: number;
+  devueltas?: number;
+  canceladas?: number;
+  /** Qué parte de las órdenes KFC del día fueron de esa ciudad (0.02 = 2%) */
+  pct_del_dia?: number;
 }
 
 /** Criterio de "mal clima" (el mismo en el servidor y en pantalla):
  *  lluvia fuerte (15 mm o más), tormenta eléctrica con 10 mm o más,
  *  o ráfagas de viento de 60 km/h o más. */
 export const UMBRALES_CLIMA = { lluvia_mm: 15, tormenta_lluvia_mm: 10, rafaga_kmh: 60 };
+
+/** Para que el mal clima sea relevante, la ciudad debe pesar en la operación
+ * ese día: al menos 20 órdenes y al menos 1% de las órdenes KFC del día. */
+export const RELEVANCIA_CLIMA = { min_ordenes: 20, min_pct_dia: 0.01 };
+
+export function climaRelevante(c: ClimaDia) {
+  return (c.ordenes ?? 0) >= RELEVANCIA_CLIMA.min_ordenes && (c.pct_del_dia ?? 0) >= RELEVANCIA_CLIMA.min_pct_dia;
+}
+
+/** "16 de 77 órdenes devueltas (20.8%)" */
+export function impactoClima(c: ClimaDia) {
+  const o = c.ordenes ?? 0;
+  if (!o) return "";
+  const d = c.devueltas ?? 0;
+  return `${d.toLocaleString("es-MX")} de ${o.toLocaleString("es-MX")} órdenes devueltas (${((d / o) * 100).toFixed(1)}%)`;
+}
 
 export function esMalClima(lluvia: number | null, codigo: number | null, rafaga: number | null) {
   const l = lluvia ?? 0;
@@ -486,7 +508,10 @@ export function climaPorDia(clima: ClimaDia[]) {
 export function lineaClimaDia(fecha: string, ciudades: ClimaDia[]) {
   const { m, d } = partes(fecha);
   const detalle = ciudades
-    .map((c) => `${nombreCiudad(c.ciudad)}: ${detalleClima(c)}${c.nota ? ` (nota: ${c.nota})` : ""}`)
+    .map((c) => {
+      const impacto = impactoClima(c);
+      return `${nombreCiudad(c.ciudad)}: ${detalleClima(c)}${impacto ? ` — ${impacto}` : ""}${c.nota ? ` (nota: ${c.nota})` : ""}`;
+    })
     .join("; ");
   return `${d} ${MESES_CORTOS[m]} · 🌧️ Mal clima (detectado automáticamente) · ${detalle}`;
 }
