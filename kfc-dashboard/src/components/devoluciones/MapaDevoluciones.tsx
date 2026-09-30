@@ -53,7 +53,7 @@ export default function MapaDevoluciones({
       if (cancelado || !contenedor.current || mapa.current) return;
       L.current = mod;
       const m = mod
-        .map(contenedor.current, { preferCanvas: true, scrollWheelZoom: false })
+        .map(contenedor.current, { preferCanvas: true, scrollWheelZoom: true })
         .setView([21.5, -101.5], 5);
       mod
         .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
