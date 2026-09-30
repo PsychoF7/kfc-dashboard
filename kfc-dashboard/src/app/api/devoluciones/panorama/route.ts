@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** Panorama general de un periodo: KPIs, por día, mapa, motivos y repartidor. */
+/** Panorama general de un periodo con la data de operaciones (igual que el panel principal). */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const desde = searchParams.get("desde");
@@ -21,13 +21,14 @@ export async function GET(req: Request) {
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await withRetryResult(() =>
-    supabase.rpc("get_dev_panorama", {
+    supabase.rpc("get_dev_panorama_ops", {
       p_desde: desde,
       p_hasta: hasta,
-      p_estados: lista("estado"),
+      p_zonas: lista("zona"),
+      p_ciudades: lista("ciudad"),
       p_tiendas: lista("tienda"),
       p_repartidores: lista("repartidor"),
-      p_incluir_returning: searchParams.get("returning") === "1",
+      p_incluir_returning: searchParams.get("returning") !== "0",
       p_incluir_rechazadas: searchParams.get("rechazadas") !== "0",
     })
   );
