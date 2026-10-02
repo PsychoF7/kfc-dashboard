@@ -44,6 +44,21 @@ async function enviarLote(cuerpo: Record<string, unknown>, intentos = 3) {
   throw new Error(ultimoError);
 }
 
+const dos = (n: number) => String(n).padStart(2, "0");
+/** Fecha de Excel -> "2026-09-21 18:19:20" (la misma hora que se ve en el archivo). */
+function fechaATexto(d: Date) {
+  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}:${dos(d.getMinutes())}:${dos(d.getSeconds())}`;
+}
+
+/** Excel (.xlsx): se lee en el navegador; las fechas se mandan como texto. */
+async function leerExcel(file: File): Promise<unknown[][]> {
+  const XLSX = await import("xlsx");
+  const libro = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+  const hoja = libro.Sheets[libro.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json<unknown[]>(hoja, { header: 1, raw: true, defval: null });
+  return (filas as unknown[][]).map((fila) => fila.map((c) => (c instanceof Date ? fechaATexto(c) : c)));
+}
+
 function leerCsv(file: File): Promise<string[][]> {
   return new Promise((resolve, reject) => {
     Papa.parse<string[]>(file, {
@@ -70,18 +85,21 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
   const [result, setResult] = useState<UploadResult | null>(null);
   const [progreso, setProgreso] = useState<{ hechas: number; total: number } | null>(null);
 
-  /** CSV: se lee en el navegador y se manda por partes (sirve para archivos grandes). */
-  async function cargarCsvPorPartes(f: File) {
+  /** CSV o Excel: se lee en el navegador y se manda por partes (sirve para archivos grandes). */
+  async function cargarPorPartes(f: File) {
     setStage("reading");
-    const filas = await leerCsv(f);
-    const [headers, ...datos] = filas;
+    // Dejamos que la pantalla muestre "Leyendo archivo…" antes de empezar a leer
+    await new Promise((r) => setTimeout(r, 50));
+    const filas = f.name.toLowerCase().endsWith(".csv") ? await leerCsv(f) : await leerExcel(f);
+    const [encabezados, ...datos] = filas;
+    const headers = (encabezados ?? []).map((h) => String(h ?? ""));
     if (!headers || datos.length === 0) throw new Error("El archivo está vacío o no se pudo leer.");
 
     // Solo mandamos las filas de KFC (el servidor igual lo vuelve a revisar)
     const idxTienda = headers.findIndex((h) => COLUMNAS_TIENDA.includes(normalizeHeader(h)));
     const kfc = idxTienda >= 0 ? datos.filter((r) => /kfc/i.test(String(r[idxTienda] ?? ""))) : datos;
 
-    const lotes: string[][][] = [];
+    const lotes: unknown[][][] = [];
     for (let i = 0; i < kfc.length; i += FILAS_POR_LOTE) lotes.push(kfc.slice(i, i + FILAS_POR_LOTE));
     if (lotes.length === 0) throw new Error("El archivo no tiene ninguna fila de KFC.");
 
@@ -130,9 +148,9 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
     setResult(null);
     setProgreso(null);
 
-    if (file.name.toLowerCase().endsWith(".csv")) {
+    if (/\.(csv|xlsx)$/i.test(file.name)) {
       try {
-        setResult(await cargarCsvPorPartes(file));
+        setResult(await cargarPorPartes(file));
         setFile(null);
       } catch (e) {
         setResult({ error: e instanceof Error ? e.message : "No se pudo cargar el archivo." });
