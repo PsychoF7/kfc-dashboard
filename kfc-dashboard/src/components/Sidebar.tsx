@@ -11,6 +11,7 @@ const AVAILABLE = [
   { href: "/facturacion", label: "Facturación mensual" },
   { href: "/devoluciones", label: "Devoluciones y cancelaciones" },
   { href: "/tiempos", label: "Análisis de tiempos" },
+  { href: "/flotilla", label: "Mi Flotilla" },
 ];
 
 // Estas secciones son las fases siguientes del proyecto — se muestran
