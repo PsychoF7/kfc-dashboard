@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import clsx from "clsx";
+import Papa from "papaparse";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { normalizeHeader } from "@/lib/parse/columns";
 
 type Tipo = "ops" | "ventas" | "tiempos";
 
@@ -12,6 +14,44 @@ interface UploadResult {
   rows_processed?: number;
   date_range?: string | null;
   filename?: string;
+}
+
+// Los CSV se mandan por partes: el navegador lee el archivo y lo envía en
+// lotes chicos, así se pueden cargar archivos mensuales muy grandes sin que
+// el servidor se pase de su tiempo límite.
+const FILAS_POR_LOTE = 2000;
+const LOTES_EN_PARALELO = 3;
+const COLUMNAS_TIENDA = ["restaurant", "restaurante", "nombre del restaurante"];
+
+async function enviarLote(cuerpo: Record<string, unknown>, intentos = 3) {
+  let ultimoError = "No se pudo guardar una parte del archivo.";
+  for (let i = 0; i < intentos; i++) {
+    try {
+      const res = await fetch("/api/upload/lote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) return data;
+      ultimoError = data?.error ?? `El servidor respondió ${res.status}.`;
+      if (res.status === 400) break; // error del archivo: no tiene caso reintentar
+    } catch {
+      ultimoError = "Se perdió la conexión al guardar una parte del archivo.";
+    }
+    await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+  }
+  throw new Error(ultimoError);
+}
+
+function leerCsv(file: File): Promise<string[][]> {
+  return new Promise((resolve, reject) => {
+    Papa.parse<string[]>(file, {
+      skipEmptyLines: true,
+      complete: (r) => resolve(r.data as string[][]),
+      error: (e) => reject(e),
+    });
+  });
 }
 
 const BUCKET = "raw-uploads";
@@ -26,13 +66,83 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [stage, setStage] = useState<"idle" | "uploading" | "processing">("idle");
+  const [stage, setStage] = useState<"idle" | "uploading" | "processing" | "reading">("idle");
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [progreso, setProgreso] = useState<{ hechas: number; total: number } | null>(null);
+
+  /** CSV: se lee en el navegador y se manda por partes (sirve para archivos grandes). */
+  async function cargarCsvPorPartes(f: File) {
+    setStage("reading");
+    const filas = await leerCsv(f);
+    const [headers, ...datos] = filas;
+    if (!headers || datos.length === 0) throw new Error("El archivo está vacío o no se pudo leer.");
+
+    // Solo mandamos las filas de KFC (el servidor igual lo vuelve a revisar)
+    const idxTienda = headers.findIndex((h) => COLUMNAS_TIENDA.includes(normalizeHeader(h)));
+    const kfc = idxTienda >= 0 ? datos.filter((r) => /kfc/i.test(String(r[idxTienda] ?? ""))) : datos;
+
+    const lotes: string[][][] = [];
+    for (let i = 0; i < kfc.length; i += FILAS_POR_LOTE) lotes.push(kfc.slice(i, i + FILAS_POR_LOTE));
+    if (lotes.length === 0) throw new Error("El archivo no tiene ninguna fila de KFC.");
+
+    setStage("processing");
+    setProgreso({ hechas: 0, total: kfc.length });
+    let hechas = 0;
+    let guardadas = 0;
+    let fechaMin: string | null = null;
+    let fechaMax: string | null = null;
+    const anotar = (d: { guardadas: number; fecha_min: string | null; fecha_max: string | null }, n: number) => {
+      guardadas += d.guardadas;
+      if (d.fecha_min && (!fechaMin || d.fecha_min < fechaMin)) fechaMin = d.fecha_min;
+      if (d.fecha_max && (!fechaMax || d.fecha_max > fechaMax)) fechaMax = d.fecha_max;
+      hechas += n;
+      setProgreso({ hechas, total: kfc.length });
+    };
+
+    // El primer lote abre el registro de la carga y revisa las columnas
+    const base = { tipo, filename: f.name, headers };
+    const primero = await enviarLote({ ...base, rows: lotes[0] });
+    const uploadId = primero.upload_id as string;
+    anotar(primero, lotes[0].length);
+
+    // El resto, de 3 en 3
+    let siguiente = 1;
+    async function trabajador() {
+      while (siguiente < lotes.length) {
+        const i = siguiente++;
+        const d = await enviarLote({ ...base, rows: lotes[i], upload_id: uploadId });
+        anotar(d, lotes[i].length);
+      }
+    }
+    await Promise.all(Array.from({ length: LOTES_EN_PARALELO }, trabajador));
+
+    await enviarLote({ ...base, upload_id: uploadId, final: { row_count: guardadas, date_start: fechaMin, date_end: fechaMax } });
+    return {
+      ok: true,
+      rows_processed: guardadas,
+      date_range: fechaMin && fechaMax ? `${fechaMin} → ${fechaMax}` : null,
+    } as UploadResult;
+  }
 
   async function handleUpload() {
     if (!file) return;
     setLoading(true);
     setResult(null);
+    setProgreso(null);
+
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      try {
+        setResult(await cargarCsvPorPartes(file));
+        setFile(null);
+      } catch (e) {
+        setResult({ error: e instanceof Error ? e.message : "No se pudo cargar el archivo." });
+      } finally {
+        setLoading(false);
+        setStage("idle");
+        setProgreso(null);
+      }
+      return;
+    }
 
     const path = `${tipo}/${Date.now()}-${sanitizeFilename(file.name)}`;
 
@@ -108,10 +218,28 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
         disabled={!file || loading}
         className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
       >
+        {stage === "reading" && "Leyendo archivo…"}
         {stage === "uploading" && "Subiendo archivo…"}
-        {stage === "processing" && "Procesando filas…"}
+        {stage === "processing" &&
+          (progreso
+            ? `Guardando… ${progreso.hechas.toLocaleString("es-MX")} de ${progreso.total.toLocaleString("es-MX")}`
+            : "Procesando filas…")}
         {stage === "idle" && (loading ? "Procesando…" : "Cargar archivo")}
       </button>
+
+      {progreso && (
+        <div className="mt-3">
+          <div className="h-2 w-full rounded-full bg-ink-100">
+            <div
+              className="h-2 rounded-full bg-brand-500 transition-all"
+              style={{ width: `${Math.round((progreso.hechas / Math.max(progreso.total, 1)) * 100)}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-ink-500">
+            No cierres esta pestaña hasta que termine. Los archivos grandes pueden tardar unos minutos.
+          </p>
+        </div>
+      )}
 
       {result?.ok && (
         <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
