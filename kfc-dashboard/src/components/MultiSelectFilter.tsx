@@ -9,7 +9,15 @@ interface MultiSelectFilterProps {
   onChange: (selected: string[]) => void;
 }
 
-export default function MultiSelectFilter({ label, items, selected, onChange }: MultiSelectFilterProps) {
+// Tiendas Mi Flotilla: su nombre termina en " MF"
+const esFlotilla = (item: string) => /\sMF$/i.test(String(item ?? "").trim());
+
+export default function MultiSelectFilter({ label, items: itemsCrudos, selected, onChange }: MultiSelectFilterProps) {
+  // Por si la lista trae vacíos (por ejemplo, órdenes sin zona o sin repartidor)
+  const items = useMemo(
+    () => (itemsCrudos ?? []).filter((i): i is string => typeof i === "string" && i.trim() !== ""),
+    [itemsCrudos]
+  );
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,6 +33,11 @@ export default function MultiSelectFilter({ label, items, selected, onChange }: 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Si es una lista de tiendas KFC con Delivery y Mi Flotilla, se separan en dos grupos
+  const delivery = useMemo(() => items.filter((i) => !esFlotilla(i)), [items]);
+  const flotilla = useMemo(() => items.filter((i) => esFlotilla(i)), [items]);
+  const conGrupos = items.some((i) => /kfc/i.test(i)) && delivery.length > 0 && flotilla.length > 0;
+
   const filteredItems = useMemo(() => {
     if (!search) return items;
     const q = search.toLowerCase();
@@ -39,12 +52,46 @@ export default function MultiSelectFilter({ label, items, selected, onChange }: 
     }
   }
 
+  const igual = (a: string[], b: string[]) => a.length === b.length && b.every((x) => a.includes(x));
   const buttonLabel =
     selected.length === 0
       ? "Todas"
-      : selected.length === 1
-      ? selected[0]
-      : `${selected.length} seleccionadas`;
+      : conGrupos && igual(selected, delivery)
+        ? `Solo Delivery (${delivery.length})`
+        : conGrupos && igual(selected, flotilla)
+          ? `Solo Mi Flotilla (${flotilla.length})`
+          : selected.length === items.length
+            ? `Todas (${items.length})`
+            : selected.length === 1
+              ? selected[0]
+              : `${selected.length} seleccionadas`;
+
+  const boton =
+    "rounded-md px-2 py-1.5 text-left text-xs font-medium hover:bg-brand-50 disabled:cursor-default disabled:opacity-40";
+
+  const filaItem = (item: string) => (
+    <label
+      key={item}
+      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
+    >
+      <input
+        type="checkbox"
+        checked={selected.includes(item)}
+        onChange={() => toggleItem(item)}
+        className="h-4 w-4 flex-shrink-0 rounded border-ink-300 text-brand-500 focus:ring-brand-500"
+      />
+      <span className="truncate">{item}</span>
+    </label>
+  );
+
+  const encabezadoGrupo = (texto: string, n: number) => (
+    <p className="mt-1 px-2 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
+      {texto} ({n})
+    </p>
+  );
+
+  const filtradasDelivery = filteredItems.filter((i) => !esFlotilla(i));
+  const filtradasFlotilla = filteredItems.filter((i) => esFlotilla(i));
 
   return (
     <div className="flex flex-col gap-1" ref={containerRef}>
@@ -67,7 +114,7 @@ export default function MultiSelectFilter({ label, items, selected, onChange }: 
         </button>
 
         {open && (
-          <div className="absolute z-20 mt-1 w-64 rounded-lg border border-ink-200 bg-white shadow-lg">
+          <div className="absolute z-20 mt-1 w-72 rounded-lg border border-ink-200 bg-white shadow-lg">
             <div className="border-b border-ink-100 p-2">
               <input
                 autoFocus
@@ -78,45 +125,51 @@ export default function MultiSelectFilter({ label, items, selected, onChange }: 
                 className="w-full rounded-md border border-ink-200 px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none"
               />
             </div>
-            <div className="max-h-56 overflow-y-auto p-1">
-              <div className="mb-1 flex gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const merged = new Set([...selected, ...filteredItems]);
-                    onChange(Array.from(merged));
-                  }}
-                  className="flex-1 rounded-md px-2 py-1.5 text-left text-xs font-medium text-brand-600 hover:bg-brand-50"
-                >
-                  {search ? `Seleccionar los ${filteredItems.length} filtrados` : "Seleccionar todas"}
-                </button>
-                {selected.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onChange([])}
-                    className="flex-1 rounded-md px-2 py-1.5 text-left text-xs font-medium text-ink-500 hover:bg-ink-50"
-                  >
-                    Limpiar ({selected.length})
+
+            {/* Accesos rápidos */}
+            <div className="grid grid-cols-2 gap-1 border-b border-ink-100 p-1">
+              {conGrupos && !search && (
+                <>
+                  <button type="button" onClick={() => onChange([...delivery])} className={`${boton} text-brand-600`}>
+                    Solo Delivery ({delivery.length})
                   </button>
-                )}
-              </div>
-              {filteredItems.length === 0 && (
-                <p className="px-2 py-2 text-xs text-ink-500">Sin resultados</p>
+                  <button type="button" onClick={() => onChange([...flotilla])} className={`${boton} text-brand-600`}>
+                    Solo Mi Flotilla ({flotilla.length})
+                  </button>
+                </>
               )}
-              {filteredItems.map((item) => (
-                <label
-                  key={item}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-ink-700 hover:bg-ink-50"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(item)}
-                    onChange={() => toggleItem(item)}
-                    className="h-4 w-4 flex-shrink-0 rounded border-ink-300 text-brand-500 focus:ring-brand-500"
-                  />
-                  <span className="truncate">{item}</span>
-                </label>
-              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const merged = new Set([...selected, ...filteredItems]);
+                  onChange(Array.from(merged));
+                }}
+                className={`${boton} text-brand-600`}
+              >
+                {search ? `Seleccionar los ${filteredItems.length} filtrados` : "Seleccionar todas"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                disabled={selected.length === 0}
+                className={`${boton} text-ink-500 hover:bg-ink-50`}
+              >
+                Limpiar{selected.length > 0 ? ` (${selected.length})` : ""}
+              </button>
+            </div>
+
+            <div className="max-h-56 overflow-y-auto p-1">
+              {filteredItems.length === 0 && <p className="px-2 py-2 text-xs text-ink-500">Sin resultados</p>}
+              {conGrupos ? (
+                <>
+                  {filtradasDelivery.length > 0 && encabezadoGrupo("Delivery", filtradasDelivery.length)}
+                  {filtradasDelivery.map(filaItem)}
+                  {filtradasFlotilla.length > 0 && encabezadoGrupo("Mi Flotilla", filtradasFlotilla.length)}
+                  {filtradasFlotilla.map(filaItem)}
+                </>
+              ) : (
+                filteredItems.map(filaItem)
+              )}
             </div>
           </div>
         )}
