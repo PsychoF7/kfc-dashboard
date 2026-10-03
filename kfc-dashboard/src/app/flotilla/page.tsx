@@ -245,7 +245,7 @@ function GraficaHora({ datos }: { datos: Flotilla["por_hora"] }) {
   const [hover, setHover] = useState<number | null>(null);
   const filas = datos.filter((d) => d.ordenes >= 5);
   if (filas.length === 0) return <p className="text-xs text-ink-500">Sin datos suficientes por hora.</p>;
-  const W = 1100;
+  const W = 760;
   const H = 230;
   const pad = { l: 36, r: 12, t: 16, b: 30 };
   const maxY = Math.max(META * 1.1, ...filas.map((d) => d.total_prom ?? 0)) * 1.08;
@@ -295,52 +295,6 @@ function GraficaHora({ datos }: { datos: Flotilla["por_hora"] }) {
   );
 }
 
-/** Fila de la comparación Mi Flotilla vs Delivery. */
-function FilaComparacion({
-  etiqueta,
-  mf,
-  dl,
-  formato,
-  menorEsMejor = true,
-}: {
-  etiqueta: string;
-  mf: number | null;
-  dl: number | null;
-  formato: (n: number | null) => string;
-  menorEsMejor?: boolean;
-}) {
-  const max = Math.max(mf ?? 0, dl ?? 0) || 1;
-  const mejor = mf != null && dl != null && (menorEsMejor ? mf <= dl : mf >= dl);
-  return (
-    <div>
-      <div className="flex items-baseline justify-between text-sm">
-        <span className="text-ink-900">{etiqueta}</span>
-        {mf != null && dl != null && (
-          <span className={clsx("text-xs font-semibold", mejor ? "text-success" : "text-danger")}>
-            {mejor ? "Mi Flotilla mejor" : "Delivery mejor"}
-          </span>
-        )}
-      </div>
-      <div className="mt-1.5 space-y-1">
-        {(
-          [
-            ["Mi Flotilla", mf, "#891DFF"],
-            ["Delivery", dl, "#B9B8C8"],
-          ] as const
-        ).map(([n, v, c]) => (
-          <div key={n} className="flex items-center gap-2 text-xs">
-            <span className="w-20 flex-shrink-0 text-ink-500">{n}</span>
-            <div className="h-2.5 flex-1 rounded-full bg-ink-100">
-              <div className="h-2.5 rounded-full" style={{ width: `${((v ?? 0) / max) * 100}%`, background: c }} />
-            </div>
-            <span className="w-16 flex-shrink-0 text-right font-medium tabular-nums text-ink-900">{formato(v)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------
 // Página
 // ---------------------------------------------------------------------
@@ -378,7 +332,6 @@ export default function FlotillaPage() {
   }, [query]);
 
   const k = data?.kpis;
-  const cmp = data?.comparativa;
   const hayAnterior = !!k && k.ant_ordenes > 0;
   const cargando = (v: string) => (loading ? "…" : v);
   const lista = [...(data?.tiendas ?? [])].sort((a, b) =>
@@ -475,34 +428,18 @@ export default function FlotillaPage() {
         <KpiCard label="Entrega al cliente" value={cargando(min(k?.entrega))} sublabel="De la tienda al cliente" />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Card>
           <h2 className="text-sm font-semibold text-ink-900">Tendencia por día</h2>
           <p className="mt-1 text-xs text-ink-500">Pasa el mouse para ver el detalle de cada día.</p>
           <div className="mt-3">{data?.por_dia ? <GraficaDia datos={data.por_dia} /> : <div className="h-56 animate-pulse rounded-lg bg-ink-50" />}</div>
         </Card>
         <Card>
-          <h2 className="text-sm font-semibold text-ink-900">Mi Flotilla vs Delivery</h2>
-          <p className="mt-1 text-xs text-ink-500">Mismo periodo. Delivery = Uber y Rappi.</p>
-          {cmp ? (
-            <div className="mt-4 space-y-4">
-              <FilaComparacion etiqueta="Tiempo total" mf={cmp.flotilla.total_prom} dl={cmp.delivery.total_prom} formato={(n) => min(n)} />
-              <FilaComparacion etiqueta="Hasta que sale el repartidor" mf={cmp.flotilla.recol} dl={cmp.delivery.recol} formato={(n) => min(n)} />
-              <FilaComparacion etiqueta="Entrega al cliente" mf={cmp.flotilla.entrega} dl={cmp.delivery.entrega} formato={(n) => min(n)} />
-              <FilaComparacion etiqueta="En menos de 45 min" mf={cmp.flotilla.pct_45} dl={cmp.delivery.pct_45} formato={(n) => pct(n, 0)} menorEsMejor={false} />
-              <FilaComparacion etiqueta="% Devolución" mf={cmp.flotilla.pct_dev} dl={cmp.delivery.pct_dev} formato={(n) => pct(n)} />
-              <FilaComparacion etiqueta="% Cancelación" mf={cmp.flotilla.pct_canc} dl={cmp.delivery.pct_canc} formato={(n) => pct(n)} />
-            </div>
-          ) : (
-            <div className="mt-4 h-56 animate-pulse rounded-lg bg-ink-50" />
-          )}
+          <h2 className="text-sm font-semibold text-ink-900">Tendencia por hora</h2>
+          <p className="mt-1 text-xs text-ink-500">Para ubicar los horarios con más tiempo.</p>
+          <div className="mt-3">{data?.por_hora ? <GraficaHora datos={data.por_hora} /> : <div className="h-56 animate-pulse rounded-lg bg-ink-50" />}</div>
         </Card>
       </div>
-
-      <Card className="mt-6">
-        <h2 className="text-sm font-semibold text-ink-900">Tendencia por hora</h2>
-        <div className="mt-3">{data?.por_hora ? <GraficaHora datos={data.por_hora} /> : <div className="h-56 animate-pulse rounded-lg bg-ink-50" />}</div>
-      </Card>
 
       {/* ====================== DETALLE ====================== */}
       <h2 className="mt-12 text-lg font-semibold text-ink-900">Detalle</h2>
