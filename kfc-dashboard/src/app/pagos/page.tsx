@@ -223,15 +223,16 @@ export default function PagosPage() {
   }
 
   async function actualizarHoja() {
-    const filaGeneral = filas?.find((f) => f.categoria === "general");
-    if (!week || !filaGeneral) return;
+    // La hoja "Relacion Semanal 2026" lleva los números de DELIVERY (sin Mi Flotilla)
+    const filaHoja = filas?.find((f) => f.categoria === "delivery");
+    if (!week || !filaHoja) return;
     setActualizandoHoja(true);
     setHojaResultado(null);
     try {
       const res = await fetch("/api/pagos/actualizar-hoja", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weekNumber: week.weekNumber, general: filaGeneral }),
+        body: JSON.stringify({ weekNumber: week.weekNumber, general: filaHoja }),
       });
       const data = await res.json();
       if (data?.error) throw new Error(data.error);
@@ -278,7 +279,6 @@ export default function PagosPage() {
     .slice(0, TOP_N);
 
   const filaDelivery = filas?.find((f) => f.categoria === "delivery");
-  const filaGeneral = filas?.find((f) => f.categoria === "general");
   const defaultSubject = week ? `Pago Semana ${week.weekNumber} KFC` : "";
   const defaultBody = week
     ? `Buen día Mariela.\n\nMe podrías apoyar, por favor, con la generación del pago correspondiente a la Semana ${week.weekNumber} de KFC; el monto a considerar es de ${money(
@@ -450,36 +450,37 @@ export default function PagosPage() {
             <p className="mt-2 text-xs font-medium text-danger">{hojaResultado.error}</p>
           )}
 
-          {confirmandoHoja && week && filaGeneral && (
+          {confirmandoHoja && week && filaDelivery && (
             <div className="mt-4 rounded-lg border border-brand-500 bg-brand-50 p-4">
               <p className="text-sm font-semibold text-ink-900">
                 Vas a escribir en la fila {week.weekNumber + 2} (Semana {week.weekNumber}) de la
-                pestaña "Relacion Semanal 2026":
+                pestaña "Relacion Semanal 2026" los números de <span className="text-brand-700">Delivery</span>{" "}
+                (sin Mi Flotilla):
               </p>
               <table className="mt-3 w-full text-xs">
                 <tbody>
                   <tr className="border-b border-brand-100">
                     <td className="py-1 pr-3 text-ink-500">Columna C — Monto Efectivo</td>
                     <td className="py-1 text-right font-medium text-ink-900">
-                      {money(filaGeneral.monto_efectivo)}
+                      {money(filaDelivery.monto_efectivo)}
                     </td>
                   </tr>
                   <tr className="border-b border-brand-100">
                     <td className="py-1 pr-3 text-ink-500">Columna D — # Efectivo</td>
                     <td className="py-1 text-right font-medium text-ink-900">
-                      {int(filaGeneral.n_efectivo)}
+                      {int(filaDelivery.n_efectivo)}
                     </td>
                   </tr>
                   <tr className="border-b border-brand-100">
                     <td className="py-1 pr-3 text-ink-500">Columna E — # Tarjeta</td>
                     <td className="py-1 text-right font-medium text-ink-900">
-                      {int(filaGeneral.n_tarjeta)}
+                      {int(filaDelivery.n_tarjeta)}
                     </td>
                   </tr>
                   <tr>
                     <td className="py-1 pr-3 text-ink-500">Columna F — Envíos Efectivo</td>
                     <td className="py-1 text-right font-medium text-ink-900">
-                      {money(filaGeneral.envios_efectivo)}
+                      {money(filaDelivery.envios_efectivo)}
                     </td>
                   </tr>
                 </tbody>
