@@ -3,7 +3,7 @@
 // y toleramos variantes con/sin acento como en tu Apps Script original.
 export function normalizeHeader(value: unknown): string {
   return String(value ?? "")
-    .replace(/\uFEFF/g, "") // carácter invisible que traen algunos CSV al inicio
+    .replace(/\uFEFF/g, "") // BOM que traen algunos CSV al inicio del primer encabezado
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
@@ -146,6 +146,37 @@ export const TIEMPOS_COLUMNS: ColumnDef[] = [
   { key: "tiempo_completar", aliases: ["Tiempo para completar"], type: "number" },
   { key: "sla_45", aliases: ["Tiempo total sin cooking time <45"], type: "boolean" },
   { key: "sla_60", aliases: ["Tiempo total sin cooking time <60"], type: "boolean" },
+];
+
+// -----------------------------------------------------------------------
+// Reporte de RAPPI KFC (cargo_order_report): un renglón por envío.
+// "Retailer Order ID" es el mismo orderId de la data de operaciones.
+// -----------------------------------------------------------------------
+export const RAPPI_COLUMNS: ColumnDef[] = [
+  { key: "cargo_order_id", aliases: ["Cargo Order ID"], type: "number" },
+  { key: "rappi_order_id", aliases: ["Rappi Order ID"], type: "text" },
+  { key: "order_id", aliases: ["Retailer Order ID"], type: "text" },
+  { key: "creada_en", aliases: ["Created at"], type: "datetime" },
+  { key: "valor", aliases: ["Order value"], type: "number" },
+  { key: "estado", aliases: ["State"], type: "text" },
+  { key: "propina", aliases: ["Tip"], type: "number" },
+  { key: "cooking_time", aliases: ["Cooking time"], type: "number" },
+  { key: "picking_point_id", aliases: ["Picking point ID"], type: "number" },
+  { key: "restaurant", aliases: ["Picking point name"], type: "text" },
+  { key: "distancia", aliases: ["Distance to User"], type: "number" },
+  { key: "min_asignar", aliases: ["Minutes to assign"], type: "number" },
+  { key: "min_a_tienda", aliases: ["Minutes to store"], type: "number" },
+  { key: "espera", aliases: ["Waiting time"], type: "number" },
+  { key: "min_a_cliente", aliases: ["Minutes to user"], type: "number" },
+  { key: "min_cierre", aliases: ["Minutes to close"], type: "number" },
+  { key: "tiempo_a_cliente", aliases: ["Order time to user"], type: "number" },
+  { key: "tiempo_cierre", aliases: ["Order time to close"], type: "number" },
+  { key: "cancelada_txt", aliases: ["Canceled"], type: "text" },
+  { key: "min_cancelacion", aliases: ["Minutes to cancelation"], type: "number" },
+  { key: "etapa_cancelacion", aliases: ["Cancelation stage"], type: "text" },
+  { key: "tipificacion_cancelacion", aliases: ["Cancelation tipification"], type: "text" },
+  { key: "cobra_efectivo_txt", aliases: ["Collect Cash"], type: "text" },
+  { key: "vehiculo", aliases: ["Vehicle"], type: "text" },
 ];
 
 // Una tienda es "Mi Flotilla" si su nombre termina en " MF"
