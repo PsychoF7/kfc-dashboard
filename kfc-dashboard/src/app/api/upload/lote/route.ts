@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetry } from "@/lib/supabase/retry";
-import { OPS_COLUMNS, TIEMPOS_COLUMNS, VENTAS_COLUMNS } from "@/lib/parse/columns";
+import { OPS_COLUMNS, RAPPI_COLUMNS, TIEMPOS_COLUMNS, VENTAS_COLUMNS } from "@/lib/parse/columns";
 import { findMissingRequiredColumns, mapRows } from "@/lib/parse/parseFile";
 
 // Carga por partes: el navegador lee el CSV y lo manda en lotes chicos.
@@ -12,10 +12,18 @@ export const maxDuration = 60;
 
 const BATCH_SIZE = 500;
 
+// clave = la columna que identifica cada renglón (si ya existe, se actualiza)
 const TIPO_CONFIG = {
-  ops: { table: "ops_orders", columns: OPS_COLUMNS, required: ["order_id", "estatus_orden"] },
-  ventas: { table: "ventas_orders", columns: VENTAS_COLUMNS, required: ["order_id", "estatus_orden"] },
-  tiempos: { table: "tiempos_orders", columns: TIEMPOS_COLUMNS, required: ["order_id", "estatus_orden", "direccion"] },
+  ops: { table: "ops_orders", columns: OPS_COLUMNS, required: ["order_id", "estatus_orden"], clave: "order_id" },
+  ventas: { table: "ventas_orders", columns: VENTAS_COLUMNS, required: ["order_id", "estatus_orden"], clave: "order_id" },
+  tiempos: {
+    table: "tiempos_orders",
+    columns: TIEMPOS_COLUMNS,
+    required: ["order_id", "estatus_orden", "direccion"],
+    clave: "order_id",
+  },
+  // Reporte de Rappi KFC: un renglón por envío (una orden puede tener varios)
+  rappi: { table: "rappi_envios", columns: RAPPI_COLUMNS, required: ["cargo_order_id", "order_id", "estado"], clave: "cargo_order_id" },
 } as const;
 
 type Tipo = keyof typeof TIPO_CONFIG;
@@ -87,8 +95,8 @@ export async function POST(req: Request) {
     });
     const unicos = new Map<string, (typeof soloKfc)[number]>();
     for (const r of soloKfc) {
-      const id = r.values.order_id as string | null;
-      if (id) unicos.set(id, r);
+      const id = r.values[config.clave];
+      if (id !== null && id !== undefined && id !== "") unicos.set(String(id), r);
     }
     const filas = Array.from(unicos.values());
 
@@ -98,7 +106,7 @@ export async function POST(req: Request) {
         upload_batch_id: uploadId,
         updated_at: new Date().toISOString(),
       }));
-      const { error } = await withRetry(() => supabase.from(config.table).upsert(lote, { onConflict: "order_id" }));
+      const { error } = await withRetry(() => supabase.from(config.table).upsert(lote, { onConflict: config.clave }));
       if (error) throw error;
     }
 
