@@ -6,7 +6,7 @@ import Papa from "papaparse";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { normalizeHeader } from "@/lib/parse/columns";
 
-type Tipo = "ops" | "ventas" | "tiempos";
+type Tipo = "ops" | "ventas" | "tiempos" | "rappi";
 
 interface UploadResult {
   ok?: boolean;
@@ -21,7 +21,7 @@ interface UploadResult {
 // el servidor se pase de su tiempo límite.
 const FILAS_POR_LOTE = 2000;
 const LOTES_EN_PARALELO = 3;
-const COLUMNAS_TIENDA = ["restaurant", "restaurante", "nombre del restaurante"];
+const COLUMNAS_TIENDA = ["restaurant", "restaurante", "nombre del restaurante", "picking point name"];
 
 async function enviarLote(cuerpo: Record<string, unknown>, intentos = 3) {
   let ultimoError = "No se pudo guardar una parte del archivo.";
@@ -298,6 +298,11 @@ export default function UploadPage() {
           tipo="tiempos"
           title="Data de Tiempos"
           description="El CSV kfcDeliveryTimesFrom… — base de Devoluciones y cancelaciones."
+        />
+        <UploadCard
+          tipo="rappi"
+          title="Reporte de Rappi KFC"
+          description="El cargo_order_report que descargas de la plataforma de Rappi (Rappi exclusivo de KFC)."
         />
       </div>
     </div>
