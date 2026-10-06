@@ -12,6 +12,7 @@ const AVAILABLE = [
   { href: "/devoluciones", label: "Devoluciones y cancelaciones" },
   { href: "/tiempos", label: "Análisis de tiempos" },
   { href: "/flotilla", label: "Mi Flotilla" },
+  { href: "/rappi", label: "Rappi" },
 ];
 
 // Estas secciones son las fases siguientes del proyecto — se muestran
