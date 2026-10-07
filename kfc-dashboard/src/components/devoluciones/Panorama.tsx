@@ -15,6 +15,7 @@ import {
   nombreCiudad,
   sumarDias,
 } from "@/lib/devoluciones";
+import DetalleDia, { DetalleDiaVacio, buscarPrevio, type FilaDia } from "@/components/DetalleDia";
 import Incidencias from "./Incidencias";
 import { colorPct, type MetricaMapa, type TiendaMapa } from "./MapaDevoluciones";
 
@@ -96,6 +97,7 @@ function GraficaDiaria({
   clima: ClimaDia[];
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [fijo, setFijo] = useState<number | null>(null);
   if (datos.length < 2) {
     return <p className="text-xs text-ink-500">Elige un periodo de al menos 2 días para ver la tendencia.</p>;
   }
@@ -122,7 +124,9 @@ function GraficaDiaria({
     const t = new Date(iso + "T00:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "short" });
     return t.charAt(0).toUpperCase() + t.slice(1);
   };
-  const sel = hover != null ? datos[hover] : null;
+  const activo = hover ?? fijo;
+  const sel = activo != null ? datos[activo] : null;
+  const previo = sel ? buscarPrevio(datos, sel.dia) : undefined;
   const delDia = (dia: string) => incidencias.filter((x) => x.fecha_inicio <= dia && x.fecha_fin >= dia);
   const climaDelDia = (dia: string) => clima.filter((c) => c.fecha === dia && !c.descartado);
   const incSel = sel ? delDia(sel.dia) : [];
@@ -182,13 +186,13 @@ function GraficaDiaria({
         <path d={area} fill="url(#gradDev)" />
         <path d={linea("pct_canc")} fill="none" stroke="#7D8FFF" strokeWidth="2" />
         <path d={linea("pct_dev")} fill="none" stroke="#891DFF" strokeWidth="2.5" />
-        {hover != null && (
-          <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={H - pad.b} stroke="#CFCEDD" strokeDasharray="3 3" />
+        {activo != null && (
+          <line x1={x(activo)} x2={x(activo)} y1={pad.t} y2={H - pad.b} stroke="#CFCEDD" strokeDasharray="3 3" />
         )}
         {datos.map((d, i) => (
           <g key={d.dia}>
-            <circle cx={x(i)} cy={y(d.pct_dev ?? 0)} r={hover === i ? 4.5 : 2.5} fill="#891DFF" />
-            <circle cx={x(i)} cy={y(d.pct_canc ?? 0)} r={hover === i ? 4 : 2} fill="#7D8FFF" />
+            <circle cx={x(i)} cy={y(d.pct_dev ?? 0)} r={activo === i ? 4.5 : 2.5} fill="#891DFF" />
+            <circle cx={x(i)} cy={y(d.pct_canc ?? 0)} r={activo === i ? 4 : 2} fill="#7D8FFF" />
             {i % cadaCuanto === 0 && (
               <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
                 {etiqueta(d.dia)}
@@ -200,46 +204,13 @@ function GraficaDiaria({
               width={paso}
               height={H - pad.t - pad.b}
               fill="transparent"
+              style={{ cursor: "pointer" }}
               onMouseEnter={() => setHover(i)}
+              onClick={() => setFijo((v) => (v === i ? null : i))}
             />
           </g>
         ))}
       </svg>
-      {sel && hover != null && (
-        <div
-          className="pointer-events-none absolute top-2 z-10 w-60 rounded-lg border border-ink-100 bg-white p-3 text-xs shadow-card"
-          style={{
-            left: `${Math.min(Math.max((x(hover) / W) * 100, 12), 70)}%`,
-          }}
-        >
-          <p className="font-semibold text-ink-900">{diaSemana(sel.dia)}</p>
-          <p className="mt-1 text-ink-700">
-            <span className="font-medium text-brand-600">{pct(sel.pct_dev)}</span> devolución ·{" "}
-            {int(sel.devueltas)} órdenes
-          </p>
-          <p className="text-ink-700">
-            <span className="font-medium" style={{ color: "#5A6BE0" }}>{pct(sel.pct_canc)}</span> cancelación ·{" "}
-            {int(sel.canceladas)} órdenes
-          </p>
-          <p className="mt-1 text-ink-500">{int(sel.total)} órdenes en total</p>
-          {incSel.map((x) => (
-            <p key={x.id} className="mt-1.5 border-t border-ink-100 pt-1.5 text-ink-700">
-              {TIPOS_INCIDENCIA[x.tipo]?.icono} <span className="font-medium">{TIPOS_INCIDENCIA[x.tipo]?.label}</span>:{" "}
-              {x.descripcion}
-            </p>
-          ))}
-          {climaSel.length > 0 && (
-            <p className="mt-1.5 border-t border-ink-100 pt-1.5 text-ink-700">
-              🌧️ <span className="font-medium">Mal clima:</span>{" "}
-              {climaSel
-                .slice(0, 4)
-                .map((c) => `${nombreCiudad(c.ciudad)} (${detalleClima(c)})`)
-                .join("; ")}
-              {climaSel.length > 4 ? ` y ${climaSel.length - 4} más` : ""}
-            </p>
-          )}
-        </div>
-      )}
       <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-brand-500" /> % Devolución
@@ -257,6 +228,44 @@ function GraficaDiaria({
         )}
         {clima.some((c) => !c.descartado) && <span>🌧️ Mal clima en alguna ciudad (automático)</span>}
       </div>
+      {sel ? (
+        <DetalleDia
+          dia={sel.dia}
+          hayPrevio={!!previo}
+          filas={
+            [
+              { etiqueta: "Órdenes", actual: sel.total, previo: previo?.total, formato: "n", mejor: null },
+              { etiqueta: "Devueltas", actual: sel.devueltas, previo: previo?.devueltas, formato: "n", mejor: "baja" },
+              { etiqueta: "% devolución", actual: sel.pct_dev, previo: previo?.pct_dev, formato: "pct", mejor: "baja" },
+              { etiqueta: "Canceladas", actual: sel.canceladas, previo: previo?.canceladas, formato: "n", mejor: "baja" },
+              { etiqueta: "% cancelación", actual: sel.pct_canc, previo: previo?.pct_canc, formato: "pct", mejor: "baja" },
+            ] as FilaDia[]
+          }
+          extra={
+            incSel.length + climaSel.length > 0 ? (
+              <div className="mt-2 border-t border-ink-100 pt-2 text-xs text-ink-700">
+                {incSel.map((x) => (
+                  <p key={x.id} className="mt-1">
+                    {TIPOS_INCIDENCIA[x.tipo]?.icono} <span className="font-medium">{TIPOS_INCIDENCIA[x.tipo]?.label}</span>: {x.descripcion}
+                  </p>
+                ))}
+                {climaSel.length > 0 && (
+                  <p className="mt-1">
+                    🌧️ <span className="font-medium">Mal clima:</span>{" "}
+                    {climaSel
+                      .slice(0, 4)
+                      .map((c) => `${nombreCiudad(c.ciudad)} (${detalleClima(c)})`)
+                      .join("; ")}
+                    {climaSel.length > 4 ? ` y ${climaSel.length - 4} más` : ""}
+                  </p>
+                )}
+              </div>
+            ) : undefined
+          }
+        />
+      ) : (
+        <DetalleDiaVacio />
+      )}
     </div>
   );
 }
@@ -504,7 +513,7 @@ export default function Panorama() {
       {/* Tendencia por día */}
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
         <h2 className="text-sm font-semibold text-ink-900">Tendencia por día</h2>
-        <p className="mt-1 text-xs text-ink-500">Pasa el mouse sobre la gráfica para ver el detalle de cada día.</p>
+        <p className="mt-1 text-xs text-ink-500">Pasa el mouse sobre un día para ver su detalle y compararlo con la semana anterior; da clic para dejarlo fijo.</p>
         <div className="mt-3">
           {data ? (
             <GraficaDiaria datos={data.por_dia} incidencias={incidencias} clima={climaVisible} />
