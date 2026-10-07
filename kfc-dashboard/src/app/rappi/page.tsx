@@ -525,6 +525,47 @@ function TiendasTurbo({ tiendas, onGuardar }: { tiendas: TurboTienda[]; onGuarda
 
 // ---------------------------------------------------------------------
 // Página
+function Delta({ actual, previo, invertir = false, minutos = false }: { actual: number | null; previo: number | null | undefined; invertir?: boolean; minutos?: boolean }) {
+  if (actual == null || previo == null) return <span className="text-ink-400">sin dato de la semana anterior</span>;
+  const dif = actual - previo;
+  if (Math.abs(dif) < 0.005) return <span className="text-ink-500">igual que la semana anterior</span>;
+  const bueno = invertir ? dif < 0 : dif > 0;
+  const rel = previo !== 0 && !minutos ? ` (${dif > 0 ? "+" : ""}${((dif / previo) * 100).toFixed(0)}%)` : "";
+  const abs = minutos ? `${dif > 0 ? "+" : ""}${dif.toFixed(1)} min` : `${dif > 0 ? "+" : ""}${Math.round(dif).toLocaleString("es-MX")}`;
+  return (
+    <span className={bueno ? "text-success" : "text-danger"}>
+      {dif > 0 ? "▲" : "▼"} {abs}
+      {rel} vs semana anterior
+    </span>
+  );
+}
+
+function DetalleDia({ dias, dia }: { dias: RappiPanorama["por_dia"]; dia: string | null }) {
+  const d = dias.find((x) => x.dia === dia);
+  if (!d) {
+    return <p className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-500">Elige una barra para ver qué pasó ese día.</p>;
+  }
+  const f = new Date(d.dia.slice(0, 10) + "T00:00:00");
+  f.setDate(f.getDate() - 7);
+  const isoPrev = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+  const p = dias.find((x) => x.dia.slice(0, 10) === isoPrev);
+  const nombre = new Date(d.dia.slice(0, 10) + "T00:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+  const pc = d.envios ? d.canceladas / d.envios : 0;
+  return (
+    <div className="mt-3 rounded-lg border border-ink-100 bg-ink-50 p-3">
+      <p className="text-sm font-semibold capitalize text-ink-900">{nombre}</p>
+      <p className="text-xs text-ink-500">Comparado con el mismo día de la semana anterior ({fechaCorta(isoPrev)}).</p>
+      <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
+        <div><dt className="text-ink-500">Envíos</dt><dd className="font-medium text-ink-900">{int(d.envios)} <Delta actual={d.envios} previo={p?.envios} /></dd></div>
+        <div><dt className="text-ink-500">Entregadas</dt><dd className="font-medium text-ink-900">{int(d.entregadas)} <Delta actual={d.entregadas} previo={p?.entregadas} /></dd></div>
+        <div><dt className="text-ink-500">Canceladas por Rappi</dt><dd className="font-medium text-ink-900">{int(d.canceladas)} · {pct(pc)} <Delta actual={d.canceladas} previo={p?.canceladas} invertir /></dd></div>
+        <div><dt className="text-ink-500">Devueltas</dt><dd className="font-medium text-ink-900">{int(d.devueltas)} <Delta actual={d.devueltas} previo={p?.devueltas} invertir /></dd></div>
+        <div><dt className="text-ink-500">Tiempo al cliente</dt><dd className="font-medium text-ink-900">{min(d.tiempo_a_cliente)} <Delta actual={d.tiempo_a_cliente} previo={p?.tiempo_a_cliente} invertir minutos /></dd></div>
+      </dl>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 export default function RappiPage() {
   const [desde, setDesde] = useState("");
@@ -533,6 +574,8 @@ export default function RappiPage() {
   const [data, setData] = useState<RappiPanorama | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [diaFijo, setDiaFijo] = useState<string | null>(null);
+  const [diaHover, setDiaHover] = useState<string | null>(null);
 
   const query = useMemo(() => {
     const p = new URLSearchParams();
@@ -638,21 +681,37 @@ export default function RappiPage() {
           <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
             <Card className="xl:col-span-2">
               <h2 className="text-sm font-semibold text-ink-900">Envíos por día</h2>
-              <div className="mt-4 flex h-40 items-end gap-1">
-                {(data?.por_dia ?? []).map((d) => (
-                  <div key={d.dia} className="flex flex-1 flex-col justify-end" title={`${fechaCorta(d.dia)}: ${int(d.entregadas)} entregadas, ${int(d.canceladas)} canceladas, ${int(d.devueltas)} devueltas`}>
-                    <div className="w-full rounded-t bg-danger/70" style={{ height: `${(d.canceladas / maxDia) * 140}px` }} />
-                    <div className="w-full bg-warning/70" style={{ height: `${(d.devueltas / maxDia) * 140}px` }} />
-                    <div className="w-full bg-success/70" style={{ height: `${(d.entregadas / maxDia) * 140}px` }} />
-                  </div>
-                ))}
+              <div className="mt-4 flex h-40 items-stretch gap-1" onMouseLeave={() => setDiaHover(null)}>
+                {(data?.por_dia ?? []).map((d) => {
+                  const activo = (diaHover ?? diaFijo) === d.dia;
+                  return (
+                    <button
+                      type="button"
+                      key={d.dia}
+                      onMouseEnter={() => setDiaHover(d.dia)}
+                      onFocus={() => setDiaHover(d.dia)}
+                      onClick={() => setDiaFijo((x) => (x === d.dia ? null : d.dia))}
+                      aria-label={`${fechaCorta(d.dia)}: ${int(d.envios)} envíos`}
+                      className={clsx(
+                        "flex flex-1 flex-col justify-end rounded-t outline-none transition-opacity",
+                        (diaHover ?? diaFijo) && !activo ? "opacity-40" : "opacity-100",
+                        activo && "bg-ink-100"
+                      )}
+                    >
+                      <div className="w-full rounded-t bg-danger/70" style={{ height: `${(d.canceladas / maxDia) * 140}px` }} />
+                      <div className="w-full bg-warning/70" style={{ height: `${(d.devueltas / maxDia) * 140}px` }} />
+                      <div className="w-full bg-success/70" style={{ height: `${(d.entregadas / maxDia) * 140}px` }} />
+                    </button>
+                  );
+                })}
               </div>
               <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-success/70" /> Entregadas</span>
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-warning/70" /> Devueltas</span>
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm bg-danger/70" /> Canceladas</span>
-                <span>Pasa el mouse sobre cada barra para ver el detalle.</span>
+                <span>Pasa el mouse para ver el detalle; da clic para dejarlo fijo.</span>
               </div>
+              <DetalleDia dias={data?.por_dia ?? []} dia={diaHover ?? diaFijo} />
             </Card>
             <Card>
               <h2 className="text-sm font-semibold text-ink-900">Rappi exclusivo vs general</h2>
