@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import clsx from "clsx";
 import FiltersBar from "@/components/FiltersBar";
 import KpiCard from "@/components/KpiCard";
+import DetalleDia, { DetalleDiaVacio, buscarPrevio, type FilaDia } from "@/components/DetalleDia";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import { DashboardFilters, EMPTY_FILTERS, FilterOptions } from "@/lib/types";
 import {
@@ -104,6 +105,7 @@ function VerMas({ total, mostrando, onClick, inicial }: { total: number; mostran
 // ---------------------------------------------------------------------
 function GraficaDia({ datos }: { datos: TiemposPanorama["por_dia"] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [fijo, setFijo] = useState<number | null>(null);
   if (datos.length < 2) return <p className="text-xs text-ink-500">Elige un periodo de al menos 2 días para ver la tendencia.</p>;
   const W = 760;
   const H = 240;
@@ -120,7 +122,9 @@ function GraficaDia({ datos }: { datos: TiemposPanorama["por_dia"] }) {
     const [, m, d] = iso.split("-").map(Number);
     return `${d}/${m}`;
   };
-  const sel = hover != null ? datos[hover] : null;
+  const activo = hover ?? fijo;
+  const sel = activo != null ? datos[activo] : null;
+  const previo = sel ? buscarPrevio(datos, sel.dia) : undefined;
   const nombreDia = (iso: string) => {
     const t = new Date(iso + "T00:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "short" });
     return t.charAt(0).toUpperCase() + t.slice(1);
@@ -143,36 +147,20 @@ function GraficaDia({ datos }: { datos: TiemposPanorama["por_dia"] }) {
         </text>
         <path d={linea("recol_prom")} fill="none" stroke="#7D8FFF" strokeWidth="2" />
         <path d={linea("total_prom")} fill="none" stroke="#891DFF" strokeWidth="2.5" />
-        {hover != null && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={H - pad.b} stroke="#CFCEDD" strokeDasharray="3 3" />}
+        {activo != null && <line x1={x(activo)} x2={x(activo)} y1={pad.t} y2={H - pad.b} stroke="#CFCEDD" strokeDasharray="3 3" />}
         {datos.map((d, i) => (
           <g key={d.dia}>
-            <circle cx={x(i)} cy={y(d.total_prom ?? 0)} r={hover === i ? 4.5 : 2.5} fill="#891DFF" />
-            <circle cx={x(i)} cy={y(d.recol_prom ?? 0)} r={hover === i ? 4 : 2} fill="#7D8FFF" />
+            <circle cx={x(i)} cy={y(d.total_prom ?? 0)} r={activo === i ? 4.5 : 2.5} fill="#891DFF" />
+            <circle cx={x(i)} cy={y(d.recol_prom ?? 0)} r={activo === i ? 4 : 2} fill="#7D8FFF" />
             {i % cada === 0 && (
               <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
                 {etiqueta(d.dia)}
               </text>
             )}
-            <rect x={x(i) - paso / 2} y={pad.t} width={paso} height={H - pad.t - pad.b} fill="transparent" onMouseEnter={() => setHover(i)} />
+            <rect x={x(i) - paso / 2} y={pad.t} width={paso} height={H - pad.t - pad.b} fill="transparent" style={{ cursor: "pointer" }} onMouseEnter={() => setHover(i)} onClick={() => setFijo((v) => (v === i ? null : i))} />
           </g>
         ))}
       </svg>
-      {sel && hover != null && (
-        <div
-          className="pointer-events-none absolute top-2 z-10 w-56 rounded-lg border border-ink-100 bg-white p-3 text-xs shadow-card"
-          style={{ left: `${Math.min(Math.max((x(hover) / W) * 100, 12), 70)}%` }}
-        >
-          <p className="font-semibold text-ink-900">{nombreDia(sel.dia)}</p>
-          <p className="mt-1 text-ink-700">
-            Tiempo total: <span className="font-medium text-brand-600">{minutos(sel.total_prom)}</span>
-          </p>
-          <p className="text-ink-700">
-            Hasta que sale el repartidor: <span className="font-medium" style={{ color: "#5A6BE0" }}>{minutos(sel.recol_prom)}</span>
-          </p>
-          <p className="text-ink-700">{pctTxt(sel.pct_45)} en menos de 45 min</p>
-          <p className="mt-1 text-ink-500">{int(sel.ordenes)} órdenes completadas</p>
-        </div>
-      )}
       <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-brand-500" /> Tiempo total promedio
@@ -184,6 +172,22 @@ function GraficaDia({ datos }: { datos: TiemposPanorama["por_dia"] }) {
           <span className="h-0 w-4 border-t-2 border-dashed border-danger" /> Meta 45 min
         </span>
       </div>
+      {sel ? (
+        <DetalleDia
+          dia={sel.dia}
+          hayPrevio={!!previo}
+          filas={
+            [
+              { etiqueta: "Órdenes completadas", actual: sel.ordenes, previo: previo?.ordenes, formato: "n", mejor: null },
+              { etiqueta: "Tiempo total promedio", actual: sel.total_prom, previo: previo?.total_prom, formato: "min", mejor: "baja" },
+              { etiqueta: "Hasta que sale el repartidor", actual: sel.recol_prom, previo: previo?.recol_prom, formato: "min", mejor: "baja" },
+              { etiqueta: "% en menos de 45 min", actual: sel.pct_45, previo: previo?.pct_45, formato: "pct", mejor: "sube" },
+            ] as FilaDia[]
+          }
+        />
+      ) : (
+        <DetalleDiaVacio />
+      )}
     </div>
   );
 }
