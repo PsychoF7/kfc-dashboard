@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
+import DetalleDia, { DetalleDiaVacio, buscarPrevio, type FilaDia } from "@/components/DetalleDia";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 
 // ---------------------------------------------------------------------
@@ -168,6 +169,7 @@ function BarraEtapas({ v, compacta = false }: { v: Partial<Record<(typeof ETAPAS
 /** Gráfica por día: barras de órdenes + línea de tiempo total. */
 function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [fijo, setFijo] = useState<number | null>(null);
   if (datos.length === 0) return <p className="text-xs text-ink-500">Sin órdenes en el periodo.</p>;
   const W = 760;
   const H = 230;
@@ -184,7 +186,9 @@ function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
     .map((p, i) => `${i === 0 ? "M" : "L"}${p}`)
     .join(" ");
   const cada = Math.max(1, Math.ceil(datos.length / 14));
-  const sel = hover != null ? datos[hover] : null;
+  const activo = hover ?? fijo;
+  const sel = activo != null ? datos[activo] : null;
+  const previo = sel ? buscarPrevio(datos, sel.dia) : undefined;
   const etiqueta = (iso: string) => {
     const [, m, d] = iso.split("-").map(Number);
     return `${d}/${m}`;
@@ -198,8 +202,8 @@ function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
           45
         </text>
         {datos.map((d, i) => (
-          <g key={d.dia} onMouseEnter={() => setHover(i)}>
-            <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} fill={hover === i ? "#F5F4FA" : "transparent"} />
+          <g key={d.dia} style={{ cursor: "pointer" }} onMouseEnter={() => setHover(i)} onClick={() => setFijo((v) => (v === i ? null : i))}>
+            <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} fill={activo === i ? "#F5F4FA" : "transparent"} />
             <rect x={pad.l + i * ancho + ancho * 0.18} y={yO(d.ordenes)} width={ancho * 0.64} height={H - pad.b - yO(d.ordenes)} rx="2" fill="#D9D4FF" />
             {i % cada === 0 && (
               <text x={xc(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
@@ -210,21 +214,9 @@ function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
         ))}
         <path d={linea} fill="none" stroke="#891DFF" strokeWidth="2.5" pointerEvents="none" />
         {datos.map((d, i) =>
-          d.total_prom == null ? null : <circle key={d.dia} cx={xc(i)} cy={yT(d.total_prom)} r={hover === i ? 4.5 : 2.5} fill="#891DFF" pointerEvents="none" />
+          d.total_prom == null ? null : <circle key={d.dia} cx={xc(i)} cy={yT(d.total_prom)} r={activo === i ? 4.5 : 2.5} fill="#891DFF" pointerEvents="none" />
         )}
       </svg>
-      {sel && hover != null && (
-        <div
-          className="pointer-events-none absolute top-2 z-10 w-52 rounded-lg border border-ink-100 bg-white p-3 text-xs shadow-card"
-          style={{ left: `${Math.min(Math.max((xc(hover) / W) * 100, 10), 70)}%` }}
-        >
-          <p className="font-semibold text-ink-900">{fechaCorta(sel.dia)}</p>
-          <p className="mt-1 text-ink-700">{int(sel.ordenes)} órdenes</p>
-          <p className="text-ink-700">Tiempo total: <span className="font-medium text-brand-600">{min(sel.total_prom)}</span></p>
-          <p className="text-ink-700">{pct(sel.pct_45)} en menos de 45 min</p>
-          <p className="text-ink-700">{int(sel.devueltas)} devueltas ({pct(sel.pct_dev)})</p>
-        </div>
-      )}
       <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
         <span className="flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-[#D9D4FF]" /> Órdenes
@@ -236,6 +228,23 @@ function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
           <span className="h-0 w-4 border-t-2 border-dashed border-danger" /> 45 min
         </span>
       </div>
+      {sel ? (
+        <DetalleDia
+          dia={sel.dia}
+          hayPrevio={!!previo}
+          filas={
+            [
+              { etiqueta: "Órdenes", actual: sel.ordenes, previo: previo?.ordenes, formato: "n", mejor: null },
+              { etiqueta: "Tiempo total promedio", actual: sel.total_prom, previo: previo?.total_prom, formato: "min", mejor: "baja" },
+              { etiqueta: "% en menos de 45 min", actual: sel.pct_45, previo: previo?.pct_45, formato: "pct", mejor: "sube" },
+              { etiqueta: "Devueltas", actual: sel.devueltas, previo: previo?.devueltas, formato: "n", mejor: "baja" },
+              { etiqueta: "% devolución", actual: sel.pct_dev, previo: previo?.pct_dev, formato: "pct", mejor: "baja" },
+            ] as FilaDia[]
+          }
+        />
+      ) : (
+        <DetalleDiaVacio />
+      )}
     </div>
   );
 }
