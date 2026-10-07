@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import type { DevOpciones, DevReporte, DevSemanaTendencia, Incidencia } from "@/lib/devoluciones";
 import { sincronizarClima } from "@/lib/clima";
+import { conCache } from "@/lib/cache";
 import type { ClimaDia } from "@/lib/devoluciones";
 
 /** Lee semana y switches de la URL (?week_start=&week_end=&returning=1&rechazadas=1). */
@@ -21,14 +22,23 @@ export function leerParametros(req: Request) {
  * va solo, sin competir con otras consultas. */
 export async function obtenerReporteBase(weekStart: string, weekEnd: string, op: DevOpciones) {
   const supabase = getSupabaseAdmin();
-  const [rep, inc] = await Promise.all([
-    withRetryResult(() =>
-      supabase.rpc("get_dev_reporte", {
-        p_week_start: weekStart,
-        p_week_end: weekEnd,
-        p_incluir_returning: op.incluirReturning,
-        p_incluir_rechazadas: op.incluirRechazadas,
-      })
+  const paramsRep = {
+    p_week_start: weekStart,
+    p_week_end: weekEnd,
+    p_incluir_returning: op.incluirReturning,
+    p_incluir_rechazadas: op.incluirRechazadas,
+  };
+  const [reporte, inc] = await Promise.all([
+    // El reporte se guarda mientras no haya data ni notas nuevas
+    conCache(
+      "dev-reporte",
+      paramsRep,
+      async () => {
+        const { data, error } = await withRetryResult(() => supabase.rpc("get_dev_reporte", paramsRep));
+        if (error) throw new Error(error.message);
+        return data as DevReporte;
+      },
+      { notas: true }
     ),
     withRetryResult(() =>
       supabase
@@ -39,9 +49,8 @@ export async function obtenerReporteBase(weekStart: string, weekEnd: string, op:
         .order("fecha_inicio", { ascending: true })
     ),
   ]);
-  if (rep.error) throw new Error(rep.error.message);
   return {
-    reporte: rep.data as DevReporte,
+    reporte,
     // Si la tabla de incidencias no existe todavía, el reporte sale igual
     incidencias: (inc.error ? [] : inc.data ?? []) as Incidencia[],
   };
