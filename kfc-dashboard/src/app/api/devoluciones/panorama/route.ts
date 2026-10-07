@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
+import { conCache } from "@/lib/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,26 +23,31 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const orden_planeada = param(searchParams, "orden_planeada");
 
+  const params = {
+    p_date_from: param(searchParams, "date_from"),
+    p_date_to: param(searchParams, "date_to"),
+    p_ciudad: arrayParam(searchParams, "ciudad"),
+    p_restaurant: arrayParam(searchParams, "restaurant"),
+    p_zona: arrayParam(searchParams, "zona"),
+    p_estatus: arrayParam(searchParams, "estatus"),
+    p_repartido_por: arrayParam(searchParams, "repartido_por"),
+    p_orden_planeada: orden_planeada === null ? null : orden_planeada === "true",
+    p_price_min: param(searchParams, "price_min"),
+    p_price_max: param(searchParams, "price_max"),
+    p_incluir_returning: searchParams.get("returning") !== "0",
+    p_incluir_rechazadas: searchParams.get("rechazadas") !== "0",
+  };
+
   const supabase = getSupabaseAdmin();
-  const { data, error } = await withRetryResult(() =>
-    supabase.rpc("get_dev_panorama_ops", {
-      p_date_from: param(searchParams, "date_from"),
-      p_date_to: param(searchParams, "date_to"),
-      p_ciudad: arrayParam(searchParams, "ciudad"),
-      p_restaurant: arrayParam(searchParams, "restaurant"),
-      p_zona: arrayParam(searchParams, "zona"),
-      p_estatus: arrayParam(searchParams, "estatus"),
-      p_repartido_por: arrayParam(searchParams, "repartido_por"),
-      p_orden_planeada: orden_planeada === null ? null : orden_planeada === "true",
-      p_price_min: param(searchParams, "price_min"),
-      p_price_max: param(searchParams, "price_max"),
-      p_incluir_returning: searchParams.get("returning") !== "0",
-      p_incluir_rechazadas: searchParams.get("rechazadas") !== "0",
-    })
-  );
-  if (error) {
-    console.error("Error en /api/devoluciones/panorama:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const data = await conCache("dev-panorama", params, async () => {
+      const { data, error } = await withRetryResult(() => supabase.rpc("get_dev_panorama_ops", params));
+      if (error) throw new Error(error.message);
+      return data ?? {};
+    });
+    return NextResponse.json(data, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  } catch (err) {
+    console.error("Error en /api/devoluciones/panorama:", err);
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Error desconocido" }, { status: 500 });
   }
-  return NextResponse.json(data ?? {}, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }
