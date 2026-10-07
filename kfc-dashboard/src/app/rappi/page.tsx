@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
+import DetalleDiaBase, { DetalleDiaVacio, buscarPrevio, type FilaDia } from "@/components/DetalleDia";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import {
   ETAPAS_CANCELACION,
@@ -525,45 +526,21 @@ function TiendasTurbo({ tiendas, onGuardar }: { tiendas: TurboTienda[]; onGuarda
 
 // ---------------------------------------------------------------------
 // Página
-function Delta({ actual, previo, invertir = false, minutos = false }: { actual: number | null; previo: number | null | undefined; invertir?: boolean; minutos?: boolean }) {
-  if (actual == null || previo == null) return <span className="text-ink-400">sin dato de la semana anterior</span>;
-  const dif = actual - previo;
-  if (Math.abs(dif) < 0.005) return <span className="text-ink-500">igual que la semana anterior</span>;
-  const bueno = invertir ? dif < 0 : dif > 0;
-  const rel = previo !== 0 && !minutos ? ` (${dif > 0 ? "+" : ""}${((dif / previo) * 100).toFixed(0)}%)` : "";
-  const abs = minutos ? `${dif > 0 ? "+" : ""}${dif.toFixed(1)} min` : `${dif > 0 ? "+" : ""}${Math.round(dif).toLocaleString("es-MX")}`;
-  return (
-    <span className={bueno ? "text-success" : "text-danger"}>
-      {dif > 0 ? "▲" : "▼"} {abs}
-      {rel} vs semana anterior
-    </span>
-  );
-}
-
 function DetalleDia({ dias, dia }: { dias: RappiPanorama["por_dia"]; dia: string | null }) {
   const d = dias.find((x) => x.dia === dia);
-  if (!d) {
-    return <p className="mt-3 rounded-lg bg-ink-50 px-3 py-2 text-xs text-ink-500">Elige una barra para ver qué pasó ese día.</p>;
-  }
-  const f = new Date(d.dia.slice(0, 10) + "T00:00:00");
-  f.setDate(f.getDate() - 7);
-  const isoPrev = `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
-  const p = dias.find((x) => x.dia.slice(0, 10) === isoPrev);
-  const nombre = new Date(d.dia.slice(0, 10) + "T00:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
-  const pc = d.envios ? d.canceladas / d.envios : 0;
-  return (
-    <div className="mt-3 rounded-lg border border-ink-100 bg-ink-50 p-3">
-      <p className="text-sm font-semibold capitalize text-ink-900">{nombre}</p>
-      <p className="text-xs text-ink-500">Comparado con el mismo día de la semana anterior ({fechaCorta(isoPrev)}).</p>
-      <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
-        <div><dt className="text-ink-500">Envíos</dt><dd className="font-medium text-ink-900">{int(d.envios)} <Delta actual={d.envios} previo={p?.envios} /></dd></div>
-        <div><dt className="text-ink-500">Entregadas</dt><dd className="font-medium text-ink-900">{int(d.entregadas)} <Delta actual={d.entregadas} previo={p?.entregadas} /></dd></div>
-        <div><dt className="text-ink-500">Canceladas por Rappi</dt><dd className="font-medium text-ink-900">{int(d.canceladas)} · {pct(pc)} <Delta actual={d.canceladas} previo={p?.canceladas} invertir /></dd></div>
-        <div><dt className="text-ink-500">Devueltas</dt><dd className="font-medium text-ink-900">{int(d.devueltas)} <Delta actual={d.devueltas} previo={p?.devueltas} invertir /></dd></div>
-        <div><dt className="text-ink-500">Tiempo al cliente</dt><dd className="font-medium text-ink-900">{min(d.tiempo_a_cliente)} <Delta actual={d.tiempo_a_cliente} previo={p?.tiempo_a_cliente} invertir minutos /></dd></div>
-      </dl>
-    </div>
-  );
+  if (!d) return <DetalleDiaVacio />;
+  const p = buscarPrevio(dias, d.dia);
+  const pc = d.envios ? d.canceladas / d.envios : null;
+  const pcPrev = p && p.envios ? p.canceladas / p.envios : null;
+  const filas: FilaDia[] = [
+    { etiqueta: "Envíos", actual: d.envios, previo: p?.envios, formato: "n", mejor: null },
+    { etiqueta: "Entregadas", actual: d.entregadas, previo: p?.entregadas, formato: "n", mejor: "sube" },
+    { etiqueta: "Canceladas por Rappi", actual: d.canceladas, previo: p?.canceladas, formato: "n", mejor: "baja" },
+    { etiqueta: "% canceladas", actual: pc, previo: pcPrev, formato: "pct", mejor: "baja" },
+    { etiqueta: "Devueltas", actual: d.devueltas, previo: p?.devueltas, formato: "n", mejor: "baja" },
+    { etiqueta: "Tiempo al cliente", actual: d.tiempo_a_cliente, previo: p?.tiempo_a_cliente, formato: "min", mejor: "baja" },
+  ];
+  return <DetalleDiaBase dia={d.dia} filas={filas} hayPrevio={!!p} />;
 }
 
 // ---------------------------------------------------------------------
@@ -695,7 +672,7 @@ export default function RappiPage() {
                       className={clsx(
                         "flex flex-1 flex-col justify-end rounded-t outline-none transition-opacity",
                         (diaHover ?? diaFijo) && !activo ? "opacity-40" : "opacity-100",
-                        activo && "bg-ink-100"
+                        activo && "bg-ink-50"
                       )}
                     >
                       <div className="w-full rounded-t bg-danger/70" style={{ height: `${(d.canceladas / maxDia) * 140}px` }} />
