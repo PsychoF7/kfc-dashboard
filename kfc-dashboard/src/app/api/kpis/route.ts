@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
+import { conCache } from "@/lib/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function param(searchParams: URLSearchParams, key: string): string | null {
   const v = searchParams.get(key);
@@ -21,27 +23,28 @@ export async function GET(req: Request) {
 
   const orden_planeada = param(searchParams, "orden_planeada");
 
-  const { data, error } = await withRetryResult(() =>
-    supabase
-      .rpc("get_ops_summary", {
-        p_date_from: param(searchParams, "date_from"),
-        p_date_to: param(searchParams, "date_to"),
-        p_ciudad: arrayParam(searchParams, "ciudad"),
-        p_restaurant: arrayParam(searchParams, "restaurant"),
-        p_zona: arrayParam(searchParams, "zona"),
-        p_estatus: arrayParam(searchParams, "estatus"),
-        p_repartido_por: arrayParam(searchParams, "repartido_por"),
-        p_orden_planeada: orden_planeada === null ? null : orden_planeada === "true",
-        p_price_min: param(searchParams, "price_min"),
-        p_price_max: param(searchParams, "price_max"),
-      })
-      .single()
-  );
+  const params = {
+    p_date_from: param(searchParams, "date_from"),
+    p_date_to: param(searchParams, "date_to"),
+    p_ciudad: arrayParam(searchParams, "ciudad"),
+    p_restaurant: arrayParam(searchParams, "restaurant"),
+    p_zona: arrayParam(searchParams, "zona"),
+    p_estatus: arrayParam(searchParams, "estatus"),
+    p_repartido_por: arrayParam(searchParams, "repartido_por"),
+    p_orden_planeada: orden_planeada === null ? null : orden_planeada === "true",
+    p_price_min: param(searchParams, "price_min"),
+    p_price_max: param(searchParams, "price_max"),
+  };
 
-  if (error) {
-    console.error("Error en /api/kpis:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  try {
+    const data = await conCache("kpis", params, async () => {
+      const { data, error } = await withRetryResult(() => supabase.rpc("get_ops_summary", params).single());
+      if (error) throw new Error(error.message);
+      return data;
+    });
+    return NextResponse.json(data, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  } catch (err) {
+    console.error("Error en /api/kpis:", err);
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Error desconocido" }, { status: 500 });
   }
-
-  return NextResponse.json(data, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }
