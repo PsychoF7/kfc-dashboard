@@ -381,19 +381,38 @@ export default function DevolucionesPage() {
 
   useEffect(() => {
     if (!week) return;
+    let vigente = true; // si cambian de semana a medio camino, se ignora la respuesta vieja
     setLoading(true);
     setError(null);
-    fetch(`/api/devoluciones/reporte?${query}`, { cache: "no-store" })
+    setTendencia([]);
+    setClimaSemana([]);
+    // 1) Lo indispensable: el reporte aparece en cuanto está listo.
+    fetch(`/api/devoluciones/reporte?${query}&parte=base`, { cache: "no-store" })
       .then((r) => r.json())
       .then((res) => {
         if (res?.error) throw new Error(res.error);
+        if (!vigente) return;
         setReporte(res.reporte);
-        setTendencia(res.tendencia ?? []);
         setIncidenciasSemana(res.incidencias ?? []);
-        setClimaSemana(res.clima ?? []);
+        setLoading(false);
+        // 2) Tendencia y clima llegan después; si fallan, el reporte sigue ahí.
+        return fetch(`/api/devoluciones/reporte?${query}&parte=extra`, { cache: "no-store" })
+          .then((r) => r.json())
+          .then((ex) => {
+            if (!vigente || ex?.error) return;
+            setTendencia(ex.tendencia ?? []);
+            setClimaSemana(ex.clima ?? []);
+          })
+          .catch(() => {});
       })
-      .catch((e) => setError(e.message ?? "No se pudo cargar el análisis."))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!vigente) return;
+        setError(e.message ?? "No se pudo cargar el análisis.");
+        setLoading(false);
+      });
+    return () => {
+      vigente = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
