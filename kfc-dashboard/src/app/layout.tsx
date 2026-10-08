@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Gantari } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Tipografía de títulos, la misma de la página de Ambit
+const gantari = Gantari({ subsets: ["latin"], variable: "--font-gantari", weight: ["500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "Panel Operativo KFC | Ambit",
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={inter.variable}>
+    <html lang="es" className={`${inter.variable} ${gantari.variable}`}>
       <body>
         <div className="flex h-screen w-full overflow-hidden">
           <Sidebar />
