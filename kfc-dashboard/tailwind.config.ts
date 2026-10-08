@@ -35,8 +35,8 @@ const config: Config = {
         danger: { DEFAULT: "#D14545", bg: "#FBE6E6" },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        display: ["var(--font-gantari)", "var(--font-inter)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter, system-ui)", "system-ui", "sans-serif"],
+        display: ["var(--font-gantari, system-ui)", "system-ui", "sans-serif"],
       },
       boxShadow: {
         card: "0 1px 2px 0 rgb(33 33 53 / 0.03), 0 8px 24px -12px rgb(33 33 53 / 0.10)",
