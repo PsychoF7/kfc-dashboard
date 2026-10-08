@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
-import DetalleDiaBase, { DetalleDiaVacio, buscarPrevio, type FilaDia } from "@/components/DetalleDia";
+import DetalleDiaBase, { DetalleDiaVacio, buscarPrevio, isoMasDias, type FilaDia } from "@/components/DetalleDia";
+import { getWeekRange } from "@/lib/week";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import {
   ETAPAS_CANCELACION,
@@ -21,6 +22,15 @@ const pct = (x: number | null | undefined, d = 1) => (x == null ? "—" : `${(x 
 const money = (n: number | null | undefined) => (n == null ? "—" : `$${Math.round(n).toLocaleString("es-MX")}`);
 const fechaCorta = (iso: string) =>
   new Date(iso.slice(0, 10) + "T00:00:00").toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+/** "Semana 36" y "31 ago – 6 sep" para el lunes que llega como yyyy-mm-dd. */
+const diaMes = (iso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("es-MX", { day: "numeric", month: "short", timeZone: "UTC" });
+};
+const infoSemana = (lunes: string) => ({
+  numero: getWeekRange(lunes.slice(0, 10)).weekNumber,
+  rango: `${diaMes(lunes)} – ${diaMes(isoMasDias(lunes, 6))}`,
+});
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const nombreMes = (iso: string) => {
   const [y, m] = iso.split("-").map(Number);
@@ -400,7 +410,7 @@ function Turbo() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
-                      <th className="py-2 pr-4 font-medium">Semana del</th>
+                      <th className="py-2 pr-4 font-medium">Semana</th>
                       <th className="py-2 pr-4 text-right font-medium">Órdenes</th>
                       <th className="py-2 pr-4 text-right font-medium">% Completas</th>
                       <th className="py-2 pr-4 text-right font-medium">% Devueltas</th>
@@ -414,7 +424,10 @@ function Turbo() {
                     {data.semanas.map((s) => (
                       <tr key={s.semana} className="border-b border-ink-100 last:border-0">
                         <td className="py-2 pr-4 text-ink-900">
-                          {fechaCorta(s.semana)}
+                          <span className="font-medium">Semana {infoSemana(s.semana).numero}</span>
+                          <span className="ml-2 text-xs text-ink-500">
+                            {infoSemana(s.semana).rango} {s.semana.slice(0, 4)}
+                          </span>
                           {s.semana <= data.activacion && data.activacion < new Date(new Date(s.semana).getTime() + 7 * 864e5).toISOString().slice(0, 10) && (
                             <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">activación</span>
                           )}
