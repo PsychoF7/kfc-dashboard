@@ -7,8 +7,62 @@
 }
 
 body {
-  @apply bg-ink-50 text-ink-900 antialiased;
+  @apply text-ink-900 antialiased;
+  background-color: #f5f5fa; /* fondo más claro para que las tarjetas blancas respiren */
 }
+
+/* ---- Estilo general (inspirado en la página de Ambit) ---- */
+
+/* Títulos con la tipografía de Ambit */
+h1,
+h2,
+h3 {
+  font-family: var(--font-gantari), var(--font-inter), system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+h1.text-xl {
+  font-size: 1.75rem;
+  line-height: 2.1rem;
+  font-weight: 700;
+}
+
+/* Más aire alrededor del contenido de cada pantalla */
+main > div.mx-auto {
+  padding-top: 2.5rem;
+  padding-bottom: 4rem;
+}
+@media (min-width: 1024px) {
+  main > div.mx-auto {
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+/* Tarjetas: esquinas más redondeadas, borde suave y más espacio interno */
+.shadow-card {
+  border-radius: 1.25rem;
+  border-color: #ececf4;
+}
+.shadow-card.p-5 {
+  padding: 1.5rem;
+}
+.shadow-card > h2:first-child {
+  font-size: 1rem;
+}
+
+/* Más separación entre bloques que van en cuadrícula */
+.grid.gap-6 {
+  gap: 1.75rem;
+}
+
+/* Botones principales en forma de píldora, como en Ambit */
+button.bg-brand-500,
+a.bg-brand-500 {
+  border-radius: 9999px;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
 
 /* Slider de rango de precio: dos <input type=range> superpuestos */
 .range-slider {
