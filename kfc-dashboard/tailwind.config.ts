@@ -36,9 +36,10 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-gantari)", "var(--font-inter)", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06)",
+        card: "0 1px 2px 0 rgb(33 33 53 / 0.03), 0 8px 24px -12px rgb(33 33 53 / 0.10)",
       },
     },
   },
