@@ -127,92 +127,6 @@ const th = "py-2 pr-4 text-xs font-medium text-ink-500";
 const td = "py-2 pr-4 text-ink-700";
 
 // ---------------------------------------------------------------------
-// Gráfica de tendencia (SVG simple, sin librerías)
-// ---------------------------------------------------------------------
-function Tendencia({ datos, semanaActual }: { datos: DevSemanaTendencia[]; semanaActual: string }) {
-  if (datos.length < 2) {
-    return (
-      <p className="text-xs text-ink-500">
-        La gráfica aparece en cuanto haya al menos dos semanas cargadas.
-      </p>
-    );
-  }
-  const W = 720;
-  const H = 220;
-  const pad = { l: 44, r: 16, t: 14, b: 30 };
-  const maxY = Math.max(META_DICIEMBRE * 1.5, ...datos.map((d) => Math.max(d.pct_dev, d.pct_canc))) * 1.1;
-  const x = (i: number) => pad.l + (i * (W - pad.l - pad.r)) / (datos.length - 1);
-  const y = (v: number) => pad.t + (1 - v / maxY) * (H - pad.t - pad.b);
-  const linea = (k: "pct_dev" | "pct_canc") =>
-    datos.map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(d[k]).toFixed(1)}`).join(" ");
-  const ticks = [0, maxY / 2, maxY].map((v) => Math.round(v * 1000) / 1000);
-  const etiqueta = (iso: string) => {
-    const [, m, d] = iso.split("-").map(Number);
-    return `${d}/${m}`;
-  };
-
-  return (
-    <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Tendencia semanal de devoluciones y cancelaciones">
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#E9EAF2" />
-            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" fill="#6E6E86">
-              {(t * 100).toFixed(1)}%
-            </text>
-          </g>
-        ))}
-        <line
-          x1={pad.l}
-          x2={W - pad.r}
-          y1={y(META_DICIEMBRE)}
-          y2={y(META_DICIEMBRE)}
-          stroke="#1F8A54"
-          strokeWidth="1.5"
-          strokeDasharray="5 4"
-        />
-        <text x={W - pad.r} y={y(META_DICIEMBRE) - 5} textAnchor="end" fontSize="10" fill="#1F8A54">
-          Meta dic. 2%
-        </text>
-        <path d={linea("pct_canc")} fill="none" stroke="#7D8FFF" strokeWidth="2" />
-        <path d={linea("pct_dev")} fill="none" stroke="#891DFF" strokeWidth="2.5" />
-        {datos.map((d, i) => (
-          <g key={d.semana_inicio}>
-            <circle
-              cx={x(i)}
-              cy={y(d.pct_dev)}
-              r={d.semana_inicio === semanaActual ? 5 : 3.5}
-              fill={d.semana_inicio === semanaActual ? "#891DFF" : "#fff"}
-              stroke="#891DFF"
-              strokeWidth="2"
-            >
-              <title>{`Semana del ${etiqueta(d.semana_inicio)}: devolución ${pct(d.pct_dev)} · cancelación ${pct(d.pct_canc)}`}</title>
-            </circle>
-            <circle cx={x(i)} cy={y(d.pct_canc)} r="3" fill="#7D8FFF">
-              <title>{`Semana del ${etiqueta(d.semana_inicio)}: cancelación ${pct(d.pct_canc)}`}</title>
-            </circle>
-            <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
-              {etiqueta(d.semana_inicio)}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-brand-500" /> % Devolución
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-peri" /> % Cancelación
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0 w-4 border-t-2 border-dashed border-success" /> Meta de diciembre
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------
 // Tabla de duplicados (GPS / teléfono / dirección) con detalle desplegable
 // ---------------------------------------------------------------------
 function TablaDuplicados({
@@ -525,7 +439,7 @@ export default function DevolucionesPage() {
         <>
           {/* Resumen + tendencia */}
           <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-5">
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-5">
               <h2 className="text-sm font-semibold text-ink-900">Resumen de la semana</h2>
               {titular && (
                 <p
@@ -571,12 +485,6 @@ export default function DevolucionesPage() {
                   <p className="mt-2 text-[11px] text-ink-500">También sale en la hoja Resumen del Excel.</p>
                 </div>
               )}
-            </Card>
-            <Card className="lg:col-span-3">
-              <h2 className="text-sm font-semibold text-ink-900">% por semana (últimas 12)</h2>
-              <div className="mt-3">
-                <Tendencia datos={tendencia} semanaActual={reporte.semana.inicio} />
-              </div>
             </Card>
           </div>
 
