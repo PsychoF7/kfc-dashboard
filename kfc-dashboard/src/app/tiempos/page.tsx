@@ -135,8 +135,8 @@ function GraficaDia({ datos }: { datos: TiemposPanorama["por_dia"] }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Tiempos promedio por día" onMouseLeave={() => setHover(null)}>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#E9EAF2" />
-            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" fill="#6E6E86">
+            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="stroke-ink-50" />
+            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" className="fill-ink-500">
               {Math.round(t)}
             </text>
           </g>
@@ -147,13 +147,13 @@ function GraficaDia({ datos }: { datos: TiemposPanorama["por_dia"] }) {
         </text>
         <path d={linea("recol_prom")} fill="none" stroke="#7D8FFF" strokeWidth="2" />
         <path d={linea("total_prom")} fill="none" stroke="#891DFF" strokeWidth="2.5" />
-        {activo != null && <line x1={x(activo)} x2={x(activo)} y1={pad.t} y2={H - pad.b} stroke="#CFCEDD" strokeDasharray="3 3" />}
+        {activo != null && <line x1={x(activo)} x2={x(activo)} y1={pad.t} y2={H - pad.b} className="stroke-ink-200" strokeDasharray="3 3" />}
         {datos.map((d, i) => (
           <g key={d.dia}>
             <circle cx={x(i)} cy={y(d.total_prom ?? 0)} r={activo === i ? 4.5 : 2.5} fill="#891DFF" />
             <circle cx={x(i)} cy={y(d.recol_prom ?? 0)} r={activo === i ? 4 : 2} fill="#7D8FFF" />
             {i % cada === 0 && (
-              <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
+              <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" className="fill-ink-500">
                 {etiqueta(d.dia)}
               </text>
             )}
@@ -212,8 +212,8 @@ function GraficaHora({ datos }: { datos: TiemposPanorama["por_hora"] }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Tiempo total promedio por hora" onMouseLeave={() => setHover(null)}>
         {[0, maxY / 2, maxY].map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#E9EAF2" />
-            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" fill="#6E6E86">
+            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="stroke-ink-50" />
+            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" className="fill-ink-500">
               {Math.round(t)}
             </text>
           </g>
@@ -223,9 +223,9 @@ function GraficaHora({ datos }: { datos: TiemposPanorama["por_hora"] }) {
           const v = d.total_prom ?? 0;
           return (
             <g key={d.hora} onMouseEnter={() => setHover(i)}>
-              <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} fill={hover === i ? "#F5F4FA" : "transparent"} />
+              <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} className={hover === i ? "fill-ink-50" : "fill-transparent"} />
               <rect x={x0} y={y(v)} width={ancho * 0.7} height={H - pad.b - y(v)} rx="3" fill={colorTotal(v)} opacity="0.85" />
-              <text x={x0 + ancho * 0.35} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
+              <text x={x0 + ancho * 0.35} y={H - 10} textAnchor="middle" fontSize="10" className="fill-ink-500">
                 {d.hora}
               </text>
             </g>
