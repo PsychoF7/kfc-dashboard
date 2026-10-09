@@ -457,7 +457,7 @@ export default function DevolucionesPage() {
                 ))}
               </ul>
               {(incidenciasSemana.length > 0 || climaPorDia(climaSemana).length > 0) && (
-                <div className="mt-4 rounded-lg bg-[#FFF4D6] p-3">
+                <div className="mt-4 rounded-lg bg-warning-bg p-3">
                   <p className="text-xs font-semibold text-ink-900">Contexto de la semana</p>
                   <ul className="mt-1.5 space-y-1.5 text-xs text-ink-700">
                     {incidenciasSemana.map((x) => (
