@@ -37,10 +37,12 @@ const ROADMAP = [
 ];
 
 const LLAVE = "kfc-menu-contraido";
+const LLAVE_TEMA = "kfc-tema";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [contraido, setContraido] = useState(false);
+  const [oscuro, setOscuro] = useState(false);
 
   // Recordar la elección entre visitas (si el navegador no lo permite, no pasa nada)
   useEffect(() => {
@@ -49,7 +51,20 @@ export default function Sidebar() {
     } catch {
       /* sin almacenamiento */
     }
+    // El tema ya se aplicó antes de pintar (ver layout.tsx); aquí solo se lee
+    setOscuro(document.documentElement.classList.contains("dark"));
   }, []);
+
+  function alternarTema() {
+    const nuevo = !oscuro;
+    document.documentElement.classList.toggle("dark", nuevo);
+    try {
+      localStorage.setItem(LLAVE_TEMA, nuevo ? "oscuro" : "claro");
+    } catch {
+      /* sin almacenamiento */
+    }
+    setOscuro(nuevo);
+  }
 
   function alternar() {
     setContraido((c) => {
@@ -126,7 +141,29 @@ export default function Sidebar() {
         )}
       </nav>
 
-      <div className="border-t border-ink-100 p-3">
+      <div className="space-y-1 border-t border-ink-100 p-3">
+        <button
+          type="button"
+          onClick={alternarTema}
+          title={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          aria-label={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          className={clsx(
+            "flex w-full items-center rounded-xl py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-900",
+            contraido ? "justify-center" : "gap-3 px-3"
+          )}
+        >
+          {oscuro ? (
+            <Icono>
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+            </Icono>
+          ) : (
+            <Icono>
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+            </Icono>
+          )}
+          {!contraido && <span>{oscuro ? "Modo claro" : "Modo oscuro"}</span>}
+        </button>
         <button
           type="button"
           onClick={alternar}
