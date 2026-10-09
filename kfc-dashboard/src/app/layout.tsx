@@ -14,7 +14,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${inter.variable} ${gantari.variable}`}>
+    <html lang="es" className={`${inter.variable} ${gantari.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Aplica el tema guardado antes de pintar la página, para que no parpadee */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('kfc-tema')==='oscuro')document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <div className="flex h-screen w-full overflow-hidden">
           <Sidebar />
