@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: "class",
   content: [
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,30 +10,35 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50: "#F3E9FF",
-          100: "#E6D1FF",
-          500: "#891DFF",
-          600: "#7015D6",
-          700: "#5A11AD",
-          900: "#370A66",
+          50: "rgb(var(--brand-50) / <alpha-value>)",
+          100: "rgb(var(--brand-100) / <alpha-value>)",
+          500: "rgb(var(--brand-500) / <alpha-value>)",
+          600: "rgb(var(--brand-600) / <alpha-value>)",
+          700: "rgb(var(--brand-700) / <alpha-value>)",
+          900: "rgb(var(--brand-900) / <alpha-value>)",
         },
         peri: {
-          DEFAULT: "#7D8FFF",
-          50: "#EEF0FF",
+          DEFAULT: "rgb(var(--peri) / <alpha-value>)",
+          50: "rgb(var(--peri-50) / <alpha-value>)",
         },
         ink: {
-          50: "#E9EAF2",
-          100: "#DEDDEB",
-          200: "#CFCEDD",
-          300: "#ABAAC2",
-          500: "#6E6E86",
-          700: "#3D3D52",
-          800: "#2B2B3D",
-          900: "#212135",
+          50: "rgb(var(--ink-50) / <alpha-value>)",
+          100: "rgb(var(--ink-100) / <alpha-value>)",
+          200: "rgb(var(--ink-200) / <alpha-value>)",
+          300: "rgb(var(--ink-300) / <alpha-value>)",
+          500: "rgb(var(--ink-500) / <alpha-value>)",
+          700: "rgb(var(--ink-700) / <alpha-value>)",
+          800: "rgb(var(--ink-800) / <alpha-value>)",
+          900: "rgb(var(--ink-900) / <alpha-value>)",
         },
-        success: { DEFAULT: "#1F8A54", bg: "#E3F5EA" },
-        warning: { DEFAULT: "#C8790A", bg: "#FBF0DD" },
-        danger: { DEFAULT: "#D14545", bg: "#FBE6E6" },
+        success: { DEFAULT: "rgb(var(--success) / <alpha-value>)", bg: "rgb(var(--success-bg) / <alpha-value>)" },
+        warning: { DEFAULT: "rgb(var(--warning) / <alpha-value>)", bg: "rgb(var(--warning-bg) / <alpha-value>)" },
+        danger: { DEFAULT: "rgb(var(--danger) / <alpha-value>)", bg: "rgb(var(--danger-bg) / <alpha-value>)" },
+      },
+      // "bg-white" es la superficie de tarjetas, menús y campos: cambia en modo oscuro.
+      // (text-white se queda blanco, para los botones morados.)
+      backgroundColor: {
+        white: "rgb(var(--surface) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-inter, system-ui)", "system-ui", "sans-serif"],
