@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
   ESTATUS,
-  PANTALLAS,
   PRIORIDADES,
   type Comentario,
   type EstatusReporte,
@@ -93,7 +92,6 @@ function FormularioNuevo({
 }) {
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [pantalla, setPantalla] = useState("");
   const [prioridad, setPrioridad] = useState<PrioridadReporte>("media");
   const [slack, setSlack] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -105,7 +103,7 @@ function FormularioNuevo({
     try {
       const { reporte } = await llamar<{ reporte: Reporte }>("/api/reportes", {
         method: "POST",
-        body: JSON.stringify({ tipo, titulo, descripcion, pantalla, prioridad, slack_url: slack, reportado_por: autor }),
+        body: JSON.stringify({ tipo, titulo, descripcion, prioridad, slack_url: slack, reportado_por: autor }),
       });
       onCreado(reporte);
     } catch (e) {
@@ -125,17 +123,6 @@ function FormularioNuevo({
         <label className="md:col-span-2">
           <span className="text-xs text-ink-500">Descripción</span>
           <textarea className={clsx(campo, "mt-1 w-full")} rows={4} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder={tipo === "bug" ? "Qué pasó, en qué pantalla, qué esperabas que pasara" : "Qué se necesita y para qué"} />
-        </label>
-        <label>
-          <span className="text-xs text-ink-500">Pantalla</span>
-          <select className={clsx(campo, "mt-1 w-full")} value={pantalla} onChange={(e) => setPantalla(e.target.value)}>
-            <option value="">Sin especificar</option>
-            {PANTALLAS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
         </label>
         <label>
           <span className="text-xs text-ink-500">Prioridad</span>
@@ -189,7 +176,6 @@ function Detalle({
 }) {
   const [titulo, setTitulo] = useState(r.titulo);
   const [descripcion, setDescripcion] = useState(r.descripcion ?? "");
-  const [pantalla, setPantalla] = useState(r.pantalla ?? "");
   const [slackUrl, setSlackUrl] = useState(r.slack_url ?? "");
   const [comentarios, setComentarios] = useState<Comentario[] | null>(null);
   const [nuevoCom, setNuevoCom] = useState("");
@@ -199,7 +185,6 @@ function Detalle({
   const sucio =
     titulo.trim() !== r.titulo ||
     descripcion.trim() !== (r.descripcion ?? "") ||
-    pantalla !== (r.pantalla ?? "") ||
     slackUrl.trim() !== (r.slack_url ?? "");
 
   useEffect(() => {
@@ -228,7 +213,7 @@ function Detalle({
     llamar<{ reporte: Reporte }>(`/api/reportes/${r.id}`, { method: "PATCH", body: JSON.stringify(cuerpo) });
 
   async function guardarCambios() {
-    const j = await accion("guardar", () => patch({ titulo, descripcion, pantalla, slack_url: slackUrl }));
+    const j = await accion("guardar", () => patch({ titulo, descripcion, slack_url: slackUrl }));
     if (j) onCambio(j.reporte);
   }
   async function revisar() {
@@ -276,18 +261,7 @@ function Detalle({
           <span className="text-xs text-ink-500">Descripción</span>
           <textarea className={clsx(campo, "mt-1 w-full")} rows={4} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </label>
-        <label>
-          <span className="text-xs text-ink-500">Pantalla</span>
-          <select className={clsx(campo, "mt-1 w-full")} value={pantalla} onChange={(e) => setPantalla(e.target.value)}>
-            <option value="">Sin especificar</option>
-            {PANTALLAS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
+        <label className="md:col-span-2">
           <span className="text-xs text-ink-500">Link de Slack</span>
           <input className={clsx(campo, "mt-1 w-full")} value={slackUrl} onChange={(e) => setSlackUrl(e.target.value)} placeholder="https://…slack.com/archives/…" />
         </label>
@@ -413,7 +387,6 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<FiltroEstatus>("abiertos");
   const [busqueda, setBusqueda] = useState("");
-  const [fPantalla, setFPantalla] = useState("");
   const [fPrioridad, setFPrioridad] = useState("");
   const [abierto, setAbierto] = useState<number | null>(null);
   const [creando, setCreando] = useState(false);
@@ -485,7 +458,6 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
           r.id === abierto ||
           (filtro === "todos" ? true : filtro === "abiertos" ? r.estatus !== "resuelto" : r.estatus === filtro)
       )
-      .filter((r) => !fPantalla || r.pantalla === fPantalla)
       .filter((r) => !fPrioridad || r.prioridad === fPrioridad)
       .filter((r) => !q || `${r.titulo} ${r.descripcion ?? ""} ${r.reportado_por ?? ""}`.toLowerCase().includes(q))
       // Abiertos: lo más urgente primero; el resto, lo más reciente primero
@@ -494,7 +466,7 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
           ? peso[a.prioridad] - peso[b.prioridad] || b.created_at.localeCompare(a.created_at)
           : b.created_at.localeCompare(a.created_at)
       );
-  }, [reportes, filtro, busqueda, fPantalla, fPrioridad, mantener, abierto]);
+  }, [reportes, filtro, busqueda, fPrioridad, mantener, abierto]);
 
   function reemplazar(r: Reporte, comentariosN?: number) {
     setReportes((lista) => lista.map((x) => (x.id === r.id ? r : x)));
@@ -614,14 +586,6 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
 
           <div className="mt-4 flex flex-wrap gap-3">
             <input className={clsx(campo, "w-full sm:w-72")} placeholder="Buscar por título o descripción…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-            <select className={campo} value={fPantalla} onChange={(e) => setFPantalla(e.target.value)}>
-              <option value="">Todas las pantallas</option>
-              {PANTALLAS.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
             <select className={campo} value={fPrioridad} onChange={(e) => setFPrioridad(e.target.value)}>
               <option value="">Toda prioridad</option>
               {PRIORIDADES.map((p) => (
@@ -650,7 +614,7 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
                         <button className="min-w-0 flex-1 basis-64 text-left" onClick={() => setAbierto(abiertoEste ? null : r.id)} aria-expanded={abiertoEste}>
                           <p className={clsx("truncate text-sm font-semibold", r.estatus === "resuelto" ? "text-ink-500 line-through" : "text-ink-900")}>{r.titulo}</p>
                           <p className="mt-0.5 text-xs text-ink-500">
-                            {[r.pantalla, r.reportado_por, hace(r.created_at)].filter(Boolean).join(" · ")}
+                            {[r.reportado_por, hace(r.created_at)].filter(Boolean).join(" · ")}
                             {(conteoCom[r.id] ?? 0) > 0 && ` · 💬 ${conteoCom[r.id]} comentario${conteoCom[r.id] === 1 ? "" : "s"}`}
                           </p>
                         </button>
