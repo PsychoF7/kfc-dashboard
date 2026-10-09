@@ -203,10 +203,10 @@ function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
         </text>
         {datos.map((d, i) => (
           <g key={d.dia} style={{ cursor: "pointer" }} onMouseEnter={() => setHover(i)} onClick={() => setFijo((v) => (v === i ? null : i))}>
-            <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} fill={activo === i ? "#F5F4FA" : "transparent"} />
-            <rect x={pad.l + i * ancho + ancho * 0.18} y={yO(d.ordenes)} width={ancho * 0.64} height={H - pad.b - yO(d.ordenes)} rx="2" fill="#D9D4FF" />
+            <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} className={activo === i ? "fill-ink-50" : "fill-transparent"} />
+            <rect x={pad.l + i * ancho + ancho * 0.18} y={yO(d.ordenes)} width={ancho * 0.64} height={H - pad.b - yO(d.ordenes)} rx="2" className="fill-brand-100" />
             {i % cada === 0 && (
-              <text x={xc(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
+              <text x={xc(i)} y={H - 10} textAnchor="middle" fontSize="10" className="fill-ink-500">
                 {etiqueta(d.dia)}
               </text>
             )}
@@ -219,7 +219,7 @@ function GraficaDia({ datos }: { datos: Flotilla["por_dia"] }) {
       </svg>
       <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-500">
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-[#D9D4FF]" /> Órdenes
+          <span className="h-3 w-3 rounded-sm bg-brand-100" /> Órdenes
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-brand-500" /> Tiempo total promedio
@@ -266,8 +266,8 @@ function GraficaHora({ datos }: { datos: Flotilla["por_hora"] }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Tiempo total por hora" onMouseLeave={() => setHover(null)}>
         {[0, maxY / 2, maxY].map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#E9EAF2" />
-            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" fill="#6E6E86">
+            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="stroke-ink-50" />
+            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" className="fill-ink-500">
               {Math.round(t)}
             </text>
           </g>
@@ -276,9 +276,9 @@ function GraficaHora({ datos }: { datos: Flotilla["por_hora"] }) {
           const v = d.total_prom ?? 0;
           return (
             <g key={d.hora} onMouseEnter={() => setHover(i)}>
-              <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} fill={hover === i ? "#F5F4FA" : "transparent"} />
+              <rect x={pad.l + i * ancho} y={pad.t} width={ancho} height={H - pad.t - pad.b} className={hover === i ? "fill-ink-50" : "fill-transparent"} />
               <rect x={pad.l + i * ancho + ancho * 0.15} y={y(v)} width={ancho * 0.7} height={H - pad.b - y(v)} rx="3" fill={colorTotal(v)} opacity="0.85" />
-              <text x={pad.l + i * ancho + ancho / 2} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
+              <text x={pad.l + i * ancho + ancho / 2} y={H - 10} textAnchor="middle" fontSize="10" className="fill-ink-500">
                 {d.hora}
               </text>
             </g>
