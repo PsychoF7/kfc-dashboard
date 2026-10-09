@@ -23,14 +23,14 @@ const AVAILABLE = [
   { href: "/tiempos", label: "Análisis de tiempos", icono: <Icono><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Icono> },
   { href: "/flotilla", label: "Mi Flotilla", icono: <Icono><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M6 17h5l3-8h3" /><path d="M10 6h3" /></Icono> },
   { href: "/rappi", label: "Rappi", icono: <Icono><path d="M3 9h18l-1.5 10a2 2 0 0 1-2 1.7H6.5a2 2 0 0 1-2-1.7z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" /></Icono> },
+  { href: "/bugs", label: "Bugs", icono: <Icono><path d="M9 9V7a3 3 0 0 1 6 0v2" /><rect x="7" y="9" width="10" height="11" rx="5" /><path d="M12 13v4M3 13h4M17 13h4M4.5 6.5 7.5 9M19.5 6.5 16.5 9M4.5 19.5 7.5 17M19.5 19.5 16.5 17" /></Icono> },
+  { href: "/desarrollos", label: "Solicitudes de desarrollo", icono: <Icono><path d="m8 8-5 4 5 4" /><path d="m16 8 5 4-5 4" /><path d="m14 5-4 14" /></Icono> },
 ];
 
 // Estas secciones son las fases siguientes del proyecto — se muestran
 // para que el roadmap sea transparente, pero aún no están construidas.
 const ROADMAP = [
   "Avisos y actualizaciones",
-  "Bugs",
-  "Solicitudes de desarrollo",
   "Altas y bajas",
   "Reembolsos",
   "Materiales",
