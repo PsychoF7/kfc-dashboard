@@ -162,7 +162,7 @@ function GraficaDiaria({
                 y={pad.t}
                 width={Math.min(paso, W - pad.r - Math.max(pad.l, x(i) - paso / 2))}
                 height={H - pad.t - pad.b}
-                fill="#FFF4D6"
+                className="fill-warning-bg"
               />
               )}
               <text x={x(i)} y={pad.t + 12} textAnchor="middle" fontSize="11">
@@ -173,8 +173,8 @@ function GraficaDiaria({
         })}
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#E9EAF2" />
-            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" fill="#6E6E86">
+            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} className="stroke-ink-50" />
+            <text x={pad.l - 6} y={y(t) + 4} textAnchor="end" fontSize="10" className="fill-ink-500">
               {(t * 100).toFixed(1)}%
             </text>
           </g>
@@ -187,14 +187,14 @@ function GraficaDiaria({
         <path d={linea("pct_canc")} fill="none" stroke="#7D8FFF" strokeWidth="2" />
         <path d={linea("pct_dev")} fill="none" stroke="#891DFF" strokeWidth="2.5" />
         {activo != null && (
-          <line x1={x(activo)} x2={x(activo)} y1={pad.t} y2={H - pad.b} stroke="#CFCEDD" strokeDasharray="3 3" />
+          <line x1={x(activo)} x2={x(activo)} y1={pad.t} y2={H - pad.b} className="stroke-ink-200" strokeDasharray="3 3" />
         )}
         {datos.map((d, i) => (
           <g key={d.dia}>
             <circle cx={x(i)} cy={y(d.pct_dev ?? 0)} r={activo === i ? 4.5 : 2.5} fill="#891DFF" />
             <circle cx={x(i)} cy={y(d.pct_canc ?? 0)} r={activo === i ? 4 : 2} fill="#7D8FFF" />
             {i % cadaCuanto === 0 && (
-              <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="#6E6E86">
+              <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" className="fill-ink-500">
                 {etiqueta(d.dia)}
               </text>
             )}
@@ -223,7 +223,7 @@ function GraficaDiaria({
         </span>
         {incidencias.length > 0 && (
           <span className="flex items-center gap-1.5">
-            <span className="h-3 w-4 rounded-sm bg-[#FFF4D6] ring-1 ring-[#F0D48A]" /> Día con incidencia registrada
+            <span className="h-3 w-4 rounded-sm bg-warning-bg ring-1 ring-warning/30" /> Día con incidencia registrada
           </span>
         )}
         {clima.some((c) => !c.descartado) && <span>🌧️ Mal clima en alguna ciudad (automático)</span>}
