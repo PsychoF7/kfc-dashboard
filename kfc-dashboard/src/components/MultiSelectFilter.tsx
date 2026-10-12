@@ -9,8 +9,9 @@ interface MultiSelectFilterProps {
   onChange: (selected: string[]) => void;
 }
 
-// Tiendas Mi Flotilla: su nombre termina en " MF"
+// Tiendas Mi Flotilla: su nombre termina en " MF". Franquicias: termina en " FQ".
 const esFlotilla = (item: string) => /\sMF$/i.test(String(item ?? "").trim());
+const esFranquicia = (item: string) => /\sFQ$/i.test(String(item ?? "").trim());
 
 export default function MultiSelectFilter({ label, items: itemsCrudos, selected, onChange }: MultiSelectFilterProps) {
   // Por si la lista trae vacíos (por ejemplo, órdenes sin zona o sin repartidor)
@@ -33,10 +34,12 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Si es una lista de tiendas KFC con Delivery y Mi Flotilla, se separan en dos grupos
-  const delivery = useMemo(() => items.filter((i) => !esFlotilla(i)), [items]);
+  // Si es una lista de tiendas KFC con Delivery, Mi Flotilla y/o Franquicias, se separan en grupos
+  const delivery = useMemo(() => items.filter((i) => !esFlotilla(i) && !esFranquicia(i)), [items]);
   const flotilla = useMemo(() => items.filter((i) => esFlotilla(i)), [items]);
-  const conGrupos = items.some((i) => /kfc/i.test(i)) && delivery.length > 0 && flotilla.length > 0;
+  const franquicia = useMemo(() => items.filter((i) => esFranquicia(i)), [items]);
+  const conGrupos =
+    items.some((i) => /kfc/i.test(i)) && delivery.length > 0 && (flotilla.length > 0 || franquicia.length > 0);
 
   const filteredItems = useMemo(() => {
     if (!search) return items;
@@ -60,7 +63,9 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
         ? `Solo Delivery (${delivery.length})`
         : conGrupos && igual(selected, flotilla)
           ? `Solo Mi Flotilla (${flotilla.length})`
-          : selected.length === items.length
+          : conGrupos && franquicia.length > 0 && igual(selected, franquicia)
+            ? `Solo Franquicias (${franquicia.length})`
+            : selected.length === items.length
             ? `Todas (${items.length})`
             : selected.length === 1
               ? selected[0]
@@ -90,8 +95,9 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
     </p>
   );
 
-  const filtradasDelivery = filteredItems.filter((i) => !esFlotilla(i));
+  const filtradasDelivery = filteredItems.filter((i) => !esFlotilla(i) && !esFranquicia(i));
   const filtradasFlotilla = filteredItems.filter((i) => esFlotilla(i));
+  const filtradasFranquicia = filteredItems.filter((i) => esFranquicia(i));
 
   return (
     <div className="flex flex-col gap-1" ref={containerRef}>
@@ -133,9 +139,16 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
                   <button type="button" onClick={() => onChange([...delivery])} className={`${boton} text-brand-600`}>
                     Solo Delivery ({delivery.length})
                   </button>
-                  <button type="button" onClick={() => onChange([...flotilla])} className={`${boton} text-brand-600`}>
-                    Solo Mi Flotilla ({flotilla.length})
-                  </button>
+                  {flotilla.length > 0 && (
+                    <button type="button" onClick={() => onChange([...flotilla])} className={`${boton} text-brand-600`}>
+                      Solo Mi Flotilla ({flotilla.length})
+                    </button>
+                  )}
+                  {franquicia.length > 0 && (
+                    <button type="button" onClick={() => onChange([...franquicia])} className={`${boton} text-brand-600`}>
+                      Solo Franquicias ({franquicia.length})
+                    </button>
+                  )}
                 </>
               )}
               <button
@@ -166,6 +179,8 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
                   {filtradasDelivery.map(filaItem)}
                   {filtradasFlotilla.length > 0 && encabezadoGrupo("Mi Flotilla", filtradasFlotilla.length)}
                   {filtradasFlotilla.map(filaItem)}
+                  {filtradasFranquicia.length > 0 && encabezadoGrupo("Franquicias", filtradasFranquicia.length)}
+                  {filtradasFranquicia.map(filaItem)}
                 </>
               ) : (
                 filteredItems.map(filaItem)
