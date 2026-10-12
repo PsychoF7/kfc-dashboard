@@ -12,7 +12,7 @@ interface DiaComparativa {
 }
 
 interface FilaDesglose {
-  categoria: "general" | "delivery" | "flotilla";
+  categoria: "general" | "delivery" | "flotilla" | "franquicia";
   monto_efectivo: number;
   n_efectivo: number;
   n_tarjeta: number;
@@ -50,7 +50,7 @@ interface HistoricoFila {
 interface SemanaHistorico {
   semana_inicio: string;
   general: HistoricoFila | undefined;
-  detalle: HistoricoFila[]; // Delivery y Mi Flotilla (lo que se despliega)
+  detalle: HistoricoFila[]; // Delivery, Mi Flotilla y Franquicias (lo que se despliega)
 }
 
 interface TiendaInactiva {
@@ -63,9 +63,10 @@ const CATEGORIA_LABEL: Record<string, string> = {
   general: "General",
   delivery: "Delivery",
   flotilla: "Mi Flotilla",
+  franquicia: "Franquicias",
 };
 
-const CATEGORIA_ORDEN: Record<string, number> = { general: 0, delivery: 1, flotilla: 2 };
+const CATEGORIA_ORDEN: Record<string, number> = { general: 0, delivery: 1, flotilla: 2, franquicia: 3 };
 
 const UMBRAL_DIFERENCIA = 5;
 const TOP_N = 5;
@@ -223,7 +224,7 @@ export default function PagosPage() {
   }
 
   async function actualizarHoja() {
-    // La hoja "Relacion Semanal 2026" lleva los números de DELIVERY (sin Mi Flotilla)
+    // La hoja "Relacion Semanal 2026" lleva los números de DELIVERY (sin Mi Flotilla ni Franquicias)
     const filaHoja = filas?.find((f) => f.categoria === "delivery");
     if (!week || !filaHoja) return;
     setActualizandoHoja(true);
@@ -291,7 +292,7 @@ export default function PagosPage() {
   ).sort((a, b) => b.localeCompare(a));
 
   // Agrupa el histórico por semana: la fila General queda visible y
-  // Delivery / Mi Flotilla se muestran solo al desplegar.
+  // Delivery / Mi Flotilla / Franquicias se muestran solo al desplegar.
   const semanasHistorico: SemanaHistorico[] = useMemo(() => {
     const mapa = new Map<string, HistoricoFila[]>();
     (historico ?? []).forEach((h) => {
@@ -349,7 +350,7 @@ export default function PagosPage() {
               Comparativa de órdenes (Ventas vs Operaciones)
             </h2>
             <span className="text-xs text-ink-500">
-              Solo completadas/devueltas, sin Mi Flotilla, solo KFC
+              Solo completadas/devueltas, sin Mi Flotilla ni Franquicias, solo KFC
             </span>
           </div>
 
@@ -455,7 +456,7 @@ export default function PagosPage() {
               <p className="text-sm font-semibold text-ink-900">
                 Vas a escribir en la fila {week.weekNumber + 2} (Semana {week.weekNumber}) de la
                 pestaña "Relacion Semanal 2026" los números de <span className="text-brand-700">Delivery</span>{" "}
-                (sin Mi Flotilla):
+                (sin Mi Flotilla ni Franquicias):
               </p>
               <table className="mt-3 w-full text-xs">
                 <tbody>
@@ -719,8 +720,8 @@ export default function PagosPage() {
         ) : (
           <>
             <p className="mt-1 text-xs text-ink-500">
-              Cada semana muestra el General. Haz clic en una semana para ver Delivery y Mi
-              Flotilla.
+              Cada semana muestra el General. Haz clic en una semana para ver Delivery, Mi
+              Flotilla y Franquicias.
             </p>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full text-sm">
