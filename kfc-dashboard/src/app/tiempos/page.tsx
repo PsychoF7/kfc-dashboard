@@ -495,20 +495,41 @@ export default function TiemposPage() {
   const query = useMemo(() => filtrosAQuery(filtros), [filtros]);
 
   useEffect(() => {
+    // Cada cambio de filtro cancela la consulta anterior: así una respuesta
+    // lenta y vieja nunca pisa a la nueva (ni se amontonan consultas).
+    const ctrl = new AbortController();
     const t = setTimeout(() => {
       setLoading(true);
       setError(null);
-      fetch(`/api/tiempos/panorama?${query}`, { cache: "no-store" })
-        .then((r) => r.json())
-        .then((res) => {
+      fetch(`/api/tiempos/panorama?${query}`, { cache: "no-store", signal: ctrl.signal })
+        .then(async (r) => {
+          const texto = await r.text();
+          let res: any = null;
+          try {
+            res = JSON.parse(texto);
+          } catch {
+            throw new Error(
+              r.status === 504 || r.status === 502
+                ? "La consulta tardó demasiado. Intenta de nuevo o con un rango de fechas más corto."
+                : "El servidor respondió algo inesperado. Intenta de nuevo."
+            );
+          }
           if (res?.error) throw new Error(res.error);
           setData(res.panorama?.kpis ? res.panorama : null);
           setZonasRojas(res.zonasRojas ?? []);
+          setLoading(false);
         })
-        .catch((e) => setError(e.message ?? "No se pudo cargar el análisis."))
-        .finally(() => setLoading(false));
+        .catch((e) => {
+          if (e?.name === "AbortError") return;
+          setData(null);
+          setError(e.message ?? "No se pudo cargar el análisis.");
+          setLoading(false);
+        });
     }, 400);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
   }, [query, recargar]);
 
   const esZonaRoja = useCallback((t: TiemposTienda) => zonasRojasDe(t, zonasRojas).length > 0, [zonasRojas]);
@@ -602,7 +623,12 @@ export default function TiemposPage() {
       )}
 
       {error && (
-        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <span>{error}</span>
+          <button onClick={() => setRecargar((n) => n + 1)} className="font-semibold underline">
+            Reintentar
+          </button>
+        </div>
       )}
 
       {/* ====================== RESUMEN VISUAL ====================== */}
