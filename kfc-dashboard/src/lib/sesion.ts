@@ -9,6 +9,7 @@ import { esRol } from "@/lib/permisos";
 
 export const COOKIE = "kfc-sesion";
 export const DURACION_SEG = 12 * 60 * 60; // 12 horas
+export const DURACION_LARGA_SEG = 30 * 24 * 60 * 60; // 30 días ("Mantener sesión iniciada")
 
 export interface Sesion {
   uid: string;
@@ -44,8 +45,8 @@ async function llave(usos: KeyUsage[]) {
   return crypto.subtle.importKey("raw", enc.encode(secreto()), { name: "HMAC", hash: "SHA-256" }, false, usos);
 }
 
-export async function firmarSesion(datos: Omit<Sesion, "exp">): Promise<string> {
-  const payload: Sesion = { ...datos, exp: Math.floor(Date.now() / 1000) + DURACION_SEG };
+export async function firmarSesion(datos: Omit<Sesion, "exp">, duracionSeg: number = DURACION_SEG): Promise<string> {
+  const payload: Sesion = { ...datos, exp: Math.floor(Date.now() / 1000) + duracionSeg };
   const cuerpo = aB64url(enc.encode(JSON.stringify(payload)));
   const firma = await crypto.subtle.sign("HMAC", await llave(["sign"]), enc.encode(cuerpo));
   return `${cuerpo}.${aB64url(new Uint8Array(firma))}`;
