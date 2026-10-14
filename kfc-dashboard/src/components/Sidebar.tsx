@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import clsx from "clsx";
+import { useSesion } from "@/components/Sesion";
+import { ETIQUETA_ROL, paginaPermitida } from "@/lib/permisos";
 
 // Íconos simples (trazo), para que el menú se entienda aun contraído.
 function Icono({ children }: { children: ReactNode }) {
@@ -24,16 +26,17 @@ const AVAILABLE = [
   { href: "/flotilla", label: "Mi Flotilla", icono: <Icono><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M6 17h5l3-8h3" /><path d="M10 6h3" /></Icono> },
   { href: "/rappi", label: "Rappi", icono: <Icono><path d="M3 9h18l-1.5 10a2 2 0 0 1-2 1.7H6.5a2 2 0 0 1-2-1.7z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" /></Icono> },
   { href: "/bugs", label: "Bugs", icono: <Icono><path d="M9 9V7a3 3 0 0 1 6 0v2" /><rect x="7" y="9" width="10" height="11" rx="5" /><path d="M12 13v4M3 13h4M17 13h4M4.5 6.5 7.5 9M19.5 6.5 16.5 9M4.5 19.5 7.5 17M19.5 19.5 16.5 17" /></Icono> },
+  { href: "/usuarios", label: "Usuarios y permisos", icono: <Icono><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></Icono> },
   { href: "/desarrollos", label: "Solicitudes de desarrollo", icono: <Icono><path d="m8 8-5 4 5 4" /><path d="m16 8 5 4-5 4" /><path d="m14 5-4 14" /></Icono> },
 ];
 
 // Estas secciones son las fases siguientes del proyecto — se muestran
 // para que el roadmap sea transparente, pero aún no están construidas.
 const ROADMAP = [
-  "Avisos y actualizaciones",
-  "Altas y bajas",
-  "Reembolsos",
-  "Materiales",
+  { label: "Avisos y actualizaciones", href: "/avisos" },
+  { label: "Altas y bajas", href: "/altas-bajas" },
+  { label: "Reembolsos", href: "/reembolsos" },
+  { label: "Materiales", href: "/materiales" },
 ];
 
 const LLAVE = "kfc-menu-contraido";
@@ -41,6 +44,11 @@ const LLAVE_TEMA = "kfc-tema";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const sesion = useSesion();
+  const rol = sesion?.rol ?? "consulta";
+  const visibles = AVAILABLE.filter((i) => paginaPermitida(rol, i.href));
+  const proximos = ROADMAP.filter((i) => paginaPermitida(rol, i.href));
+  const [saliendo, setSaliendo] = useState(false);
   const [contraido, setContraido] = useState(false);
   const [oscuro, setOscuro] = useState(false);
 
@@ -64,6 +72,15 @@ export default function Sidebar() {
       /* sin almacenamiento */
     }
     setOscuro(nuevo);
+  }
+
+  async function salir() {
+    setSaliendo(true);
+    try {
+      await fetch("/api/auth/salir", { method: "POST" });
+    } finally {
+      window.location.href = "/login";
+    }
   }
 
   function alternar() {
@@ -102,7 +119,7 @@ export default function Sidebar() {
           <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-ink-300">Disponible</p>
         )}
         <ul className="space-y-1">
-          {AVAILABLE.map((item) => {
+          {visibles.map((item) => {
             const active = pathname === item.href;
             return (
               <li key={item.href}>
@@ -124,11 +141,11 @@ export default function Sidebar() {
           })}
         </ul>
 
-        {!contraido && (
+        {!contraido && proximos.length > 0 && (
           <>
             <p className="mt-6 px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-ink-300">Próximamente</p>
             <ul className="space-y-1">
-              {ROADMAP.map((label) => (
+              {proximos.map(({ label }) => (
                 <li key={label}>
                   <span className="flex cursor-not-allowed items-center justify-between rounded-xl px-3 py-2 text-sm text-ink-300">
                     {label}
@@ -163,6 +180,38 @@ export default function Sidebar() {
             </Icono>
           )}
           {!contraido && <span>{oscuro ? "Modo claro" : "Modo oscuro"}</span>}
+        </button>
+        {sesion && (
+          <div className={clsx("rounded-xl bg-ink-50 py-2.5", contraido ? "px-0 text-center" : "px-3")}>
+            {contraido ? (
+              <p className="text-xs font-semibold text-ink-700" title={`${sesion.nombre} · ${ETIQUETA_ROL[sesion.rol]}`}>
+                {sesion.nombre.slice(0, 1).toUpperCase()}
+              </p>
+            ) : (
+              <>
+                <p className="truncate text-sm font-medium text-ink-900">{sesion.nombre}</p>
+                <p className="truncate text-xs text-ink-500">{ETIQUETA_ROL[sesion.rol]}</p>
+              </>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={salir}
+          disabled={saliendo}
+          title="Cerrar sesión"
+          aria-label="Cerrar sesión"
+          className={clsx(
+            "flex w-full items-center rounded-xl py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-900 disabled:opacity-50",
+            contraido ? "justify-center" : "gap-3 px-3"
+          )}
+        >
+          <Icono>
+            <path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4" />
+            <path d="m16 8 4 4-4 4" />
+            <path d="M20 12H9" />
+          </Icono>
+          {!contraido && <span>{saliendo ? "Saliendo…" : "Cerrar sesión"}</span>}
         </button>
         <button
           type="button"
