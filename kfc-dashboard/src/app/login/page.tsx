@@ -8,6 +8,7 @@ function Formulario() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [ver, setVer] = useState(false);
+  const [recordar, setRecordar] = useState(true);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ function Formulario() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recordar }),
       });
       const d = await res.json().catch(() => null);
       if (!res.ok) throw new Error(d?.error ?? "No se pudo iniciar sesión.");
@@ -56,6 +57,7 @@ function Formulario() {
       </label>
       <input
         id="email"
+        name="email"
         type="email"
         autoComplete="username"
         required
@@ -72,6 +74,7 @@ function Formulario() {
       <div className="relative mt-1">
         <input
           id="password"
+          name="password"
           type={ver ? "text" : "password"}
           autoComplete="current-password"
           required
@@ -87,6 +90,16 @@ function Formulario() {
           {ver ? "Ocultar" : "Ver"}
         </button>
       </div>
+
+      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-ink-700">
+        <input
+          type="checkbox"
+          checked={recordar}
+          onChange={(e) => setRecordar(e.target.checked)}
+          className="h-4 w-4 rounded border-ink-300 text-brand-500 focus:ring-brand-500"
+        />
+        Mantener sesión iniciada
+      </label>
 
       {error && (
         <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
