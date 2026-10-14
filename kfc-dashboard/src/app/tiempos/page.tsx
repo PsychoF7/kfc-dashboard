@@ -1,5 +1,6 @@
 "use client";
 
+import { useEsConsulta } from "@/components/Sesion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import clsx from "clsx";
@@ -300,6 +301,7 @@ function ZonasRojas({
   opciones: FilterOptions | null;
   onCambio: () => void;
 }) {
+  const lectura = useEsConsulta();
   const vacia = { alcance: "zona" as AlcanceZonaRoja, valores: [] as string[], horario: "", nota: "" };
   const [borrador, setBorrador] = useState<(typeof vacia & { id?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -346,7 +348,7 @@ function ZonasRojas({
           Marca zonas, ciudades o tiendas conflictivas (inseguridad, accesos difíciles, bloqueos frecuentes). Salen con
           borde rojo punteado en el mapa y marcadas en el ranking.
         </p>
-        {!borrador && (
+        {!borrador && !lectura && (
           <button
             onClick={() => {
               setError(null);
@@ -436,7 +438,7 @@ function ZonasRojas({
                 </p>
                 <p className="mt-0.5 text-sm text-ink-700">{z.nota}</p>
               </div>
-              <div className="flex flex-shrink-0 items-center gap-2 text-xs">
+              <div className={clsx("flex flex-shrink-0 items-center gap-2 text-xs", lectura && "hidden")}>
                 {borrando === z.id ? (
                   <>
                     <span className="text-ink-500">¿Borrar?</span>
@@ -473,6 +475,7 @@ function ZonasRojas({
 // Página
 // ---------------------------------------------------------------------
 export default function TiemposPage() {
+  const soloConsulta = useEsConsulta();
   const [opciones, setOpciones] = useState<FilterOptions | null>(null);
   const [filtros, setFiltros] = useState<DashboardFilters>(EMPTY_FILTERS);
   const [data, setData] = useState<TiemposPanorama | null>(null);
@@ -603,6 +606,7 @@ export default function TiemposPage() {
             Resumen visual arriba y el detalle abajo. Data de operaciones, solo órdenes completadas de KFC.
           </p>
         </div>
+        {!soloConsulta && (
         <button
           onClick={descargarExcel}
           disabled={!data || descargando || loading}
@@ -610,6 +614,7 @@ export default function TiemposPage() {
         >
           {descargando ? "Generando Excel…" : "Descargar Excel"}
         </button>
+        )}
       </div>
 
       <div className="mt-6">
