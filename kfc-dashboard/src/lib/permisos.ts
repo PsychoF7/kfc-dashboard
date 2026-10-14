@@ -35,6 +35,9 @@ const APIS_CONSULTA_GET = [
   "/api/tiempos/panorama",
   "/api/tiempos/zonas-rojas",
   "/api/flotilla/panorama",
+  "/api/reembolsos/filtros",
+  "/api/reembolsos/panorama",
+  "/api/reembolsos/detalle",
 ];
 
 function empieza(ruta: string, base: string) {
