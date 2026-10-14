@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
-import { useEsConsulta } from "@/components/Sesion";
 
 // ---------------------------------------------------------------------
 // Tipos
@@ -233,7 +232,6 @@ function colorDias(d: number) {
 // Página
 // ---------------------------------------------------------------------
 export default function ReembolsosPage() {
-  const esConsulta = useEsConsulta();
   const [opciones, setOpciones] = useState<Opciones | null>(null);
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -243,7 +241,6 @@ export default function ReembolsosPage() {
   const [tiendasSel, setTiendasSel] = useState<string[]>([]);
   const [buscar, setBuscar] = useState("");
   const [buscarFinal, setBuscarFinal] = useState("");
-  const [pagina, setPagina] = useState(0);
 
   const [data, setData] = useState<Panorama | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -294,15 +291,9 @@ export default function ReembolsosPage() {
   useEffect(() => {
     const t = setTimeout(() => {
       setBuscarFinal(buscar.trim());
-      setPagina(0);
     }, 400);
     return () => clearTimeout(t);
   }, [buscar]);
-
-  // Volver a la primera página al cambiar filtros
-  useEffect(() => {
-    setPagina(0);
-  }, [filtrosQuery]);
 
   // Panorama
   useEffect(() => {
@@ -331,11 +322,16 @@ export default function ReembolsosPage() {
 
   // Tabla de detalle
   useEffect(() => {
+    if (!buscarFinal) {
+      setDetalle(null);
+      setErrorDetalle(null);
+      return;
+    }
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       setCargandoDetalle(true);
       setErrorDetalle(null);
-      fetch(`/api/reembolsos/detalle?${detalleQuery}&pagina=${pagina}`, { cache: "no-store", signal: ctrl.signal })
+      fetch(`/api/reembolsos/detalle?${detalleQuery}`, { cache: "no-store", signal: ctrl.signal })
         .then((r) => r.json())
         .then((res) => {
           if (res?.error) throw new Error(res.error);
@@ -352,7 +348,7 @@ export default function ReembolsosPage() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [detalleQuery, pagina]);
+  }, [detalleQuery, buscarFinal]);
 
   const k = data?.kpis;
   const tiendas = data?.tiendas ?? [];
@@ -365,7 +361,6 @@ export default function ReembolsosPage() {
   const campo =
     "rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
   const hayFiltros = !!(desde || hasta || proveedores.length || motivos.length || estatus.length || tiendasSel.length);
-  const paginas = detalle ? Math.max(1, Math.ceil(detalle.total / detalle.limite)) : 1;
 
   function limpiar() {
     setDesde("");
@@ -573,96 +568,66 @@ export default function ReembolsosPage() {
         )}
       </Card>
 
-      {/* Detalle */}
-      <div className="mt-12 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-ink-900">{detalle?.busqueda ? "Resultados de la búsqueda" : "Detalle de reembolsos"}</h2>
-        {!esConsulta && (
-          <a
-            href={`/api/reembolsos/excel?${detalleQuery}`}
-            className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
-          >
-            Descargar Excel
-          </a>
-        )}
-      </div>
-      {detalle && (
-        <p className="mt-1 text-sm text-ink-500">
-          {int(detalle.total)} {detalle.total === 1 ? "reembolso" : "reembolsos"} · {money(detalle.monto)}
-        </p>
-      )}
-      {errorDetalle && <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorDetalle}</div>}
-
-      <Card className="mt-4 p-0">
-        <div className={clsx("overflow-x-auto", cargandoDetalle && "opacity-60")}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
-                <th className="px-4 py-3 font-medium">Fecha</th>
-                <th className="px-4 py-3 font-medium">Sucursal</th>
-                <th className="px-4 py-3 font-medium">Proveedor</th>
-                <th className="px-4 py-3 text-right font-medium">Monto</th>
-                <th className="px-4 py-3 font-medium">Folio</th>
-                <th className="px-4 py-3 font-medium">Estatus</th>
-                <th className="px-4 py-3 font-medium">Fecha de pago</th>
-                <th className="px-4 py-3 font-medium">Motivo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(detalle?.filas ?? []).map((f) => (
-                <tr key={f.clave} className="border-b border-ink-100 last:border-0">
-                  <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_venta)}</td>
-                  <td className="px-4 py-2 text-ink-900">{f.restaurante}</td>
-                  <td className="whitespace-nowrap px-4 py-2 text-ink-700">{f.proveedor ?? "—"}</td>
-                  <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums">{money(f.monto)}</td>
-                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-ink-700">{f.folio ?? "—"}</td>
-                  <td className="px-4 py-2">
-                    <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", COLORES_ESTATUS[f.estatus.toLowerCase()] ?? "bg-ink-50 text-ink-700")}>{f.estatus}</span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_pago)}</td>
-                  <td className="px-4 py-2 text-ink-700">{f.motivo ?? "—"}</td>
-                </tr>
-              ))}
-              {detalle && detalle.filas.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
-                    {detalle.busqueda ? "No encontré ningún reembolso con esa búsqueda." : "Sin reembolsos con estos filtros."}
-                  </td>
-                </tr>
-              )}
-              {!detalle && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
-                    Cargando…
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {detalle && detalle.total > detalle.limite && (
-          <div className="flex items-center justify-between border-t border-ink-100 px-4 py-3 text-xs text-ink-500">
-            <span>
-              Página {pagina + 1} de {paginas}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPagina((p) => Math.max(0, p - 1))}
-                disabled={pagina === 0}
-                className="rounded-lg border border-ink-200 px-3 py-1.5 font-medium text-ink-700 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setPagina((p) => Math.min(paginas - 1, p + 1))}
-                disabled={pagina >= paginas - 1}
-                className="rounded-lg border border-ink-200 px-3 py-1.5 font-medium text-ink-700 hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Siguiente
-              </button>
+      {/* Resultados de la búsqueda */}
+      {buscarFinal && (
+        <>
+          <h2 className="mt-12 text-lg font-semibold text-ink-900">Resultados de la búsqueda</h2>
+          {detalle && (
+            <p className="mt-1 text-sm text-ink-500">
+              {int(detalle.total)} {detalle.total === 1 ? "reembolso" : "reembolsos"} · {money(detalle.monto)}
+            </p>
+          )}
+          {errorDetalle && <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorDetalle}</div>}
+          <Card className="mt-4 p-0">
+            <div className={clsx("overflow-x-auto", cargandoDetalle && "opacity-60")}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
+                    <th className="px-4 py-3 font-medium">Fecha</th>
+                    <th className="px-4 py-3 font-medium">Sucursal</th>
+                    <th className="px-4 py-3 font-medium">Proveedor</th>
+                    <th className="px-4 py-3 text-right font-medium">Monto</th>
+                    <th className="px-4 py-3 font-medium">Folio</th>
+                    <th className="px-4 py-3 font-medium">Estatus</th>
+                    <th className="px-4 py-3 font-medium">Fecha de pago</th>
+                    <th className="px-4 py-3 font-medium">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(detalle?.filas ?? []).map((f) => (
+                    <tr key={f.clave} className="border-b border-ink-100 last:border-0">
+                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_venta)}</td>
+                      <td className="px-4 py-2 text-ink-900">{f.restaurante}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{f.proveedor ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums">{money(f.monto)}</td>
+                      <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-ink-700">{f.folio ?? "—"}</td>
+                      <td className="px-4 py-2">
+                        <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", COLORES_ESTATUS[f.estatus.toLowerCase()] ?? "bg-ink-50 text-ink-700")}>{f.estatus}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_pago)}</td>
+                      <td className="px-4 py-2 text-ink-700">{f.motivo ?? "—"}</td>
+                    </tr>
+                  ))}
+                  {detalle && detalle.filas.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
+                        No encontré ningún reembolso con esa búsqueda.
+                      </td>
+                    </tr>
+                  )}
+                  {!detalle && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
+                        Cargando…
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
-      </Card>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
