@@ -5,6 +5,10 @@ import clsx from "clsx";
 import {
   ESTATUS,
   PRIORIDADES,
+  SEGUIMIENTOS,
+  etiquetaJira,
+  seguimientoDe,
+  urlJira,
   type Comentario,
   type EstatusReporte,
   type PrioridadReporte,
@@ -94,6 +98,7 @@ function FormularioNuevo({
   const [descripcion, setDescripcion] = useState("");
   const [prioridad, setPrioridad] = useState<PrioridadReporte>("media");
   const [slack, setSlack] = useState("");
+  const [jira, setJira] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,7 +108,7 @@ function FormularioNuevo({
     try {
       const { reporte } = await llamar<{ reporte: Reporte }>("/api/reportes", {
         method: "POST",
-        body: JSON.stringify({ tipo, titulo, descripcion, prioridad, slack_url: slack, reportado_por: autor }),
+        body: JSON.stringify({ tipo, titulo, descripcion, prioridad, slack_url: slack, jira, reportado_por: autor }),
       });
       onCreado(reporte);
     } catch (e) {
@@ -139,6 +144,10 @@ function FormularioNuevo({
           <input className={clsx(campo, "mt-1 w-full")} value={slack} onChange={(e) => setSlack(e.target.value)} placeholder="https://…slack.com/archives/…" />
         </label>
         <label>
+          <span className="text-xs text-ink-500">Jira (clave o link, si ya tiene)</span>
+          <input className={clsx(campo, "mt-1 w-full")} value={jira} onChange={(e) => setJira(e.target.value)} placeholder="Ej. KFC-123 o https://…atlassian.net/browse/…" />
+        </label>
+        <label>
           <span className="text-xs text-ink-500">Tu nombre</span>
           <input className={clsx(campo, "mt-1 w-full")} value={autor} onChange={(e) => onAutor(e.target.value)} maxLength={100} />
         </label>
@@ -166,6 +175,7 @@ function Detalle({
   onAutor,
   onCambio,
   onBorrado,
+  onResumen,
 }: {
   r: Reporte;
   slackOk: boolean;
@@ -173,10 +183,12 @@ function Detalle({
   onAutor: (v: string) => void;
   onCambio: (r: Reporte, comentariosN?: number) => void;
   onBorrado: (id: number) => void;
+  onResumen: () => void;
 }) {
   const [titulo, setTitulo] = useState(r.titulo);
   const [descripcion, setDescripcion] = useState(r.descripcion ?? "");
   const [slackUrl, setSlackUrl] = useState(r.slack_url ?? "");
+  const [jira, setJira] = useState(r.jira ?? "");
   const [comentarios, setComentarios] = useState<Comentario[] | null>(null);
   const [nuevoCom, setNuevoCom] = useState("");
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -185,7 +197,8 @@ function Detalle({
   const sucio =
     titulo.trim() !== r.titulo ||
     descripcion.trim() !== (r.descripcion ?? "") ||
-    slackUrl.trim() !== (r.slack_url ?? "");
+    slackUrl.trim() !== (r.slack_url ?? "") ||
+    jira.trim() !== (r.jira ?? "");
 
   useEffect(() => {
     let vigente = true;
@@ -213,7 +226,7 @@ function Detalle({
     llamar<{ reporte: Reporte }>(`/api/reportes/${r.id}`, { method: "PATCH", body: JSON.stringify(cuerpo) });
 
   async function guardarCambios() {
-    const j = await accion("guardar", () => patch({ titulo, descripcion, slack_url: slackUrl }));
+    const j = await accion("guardar", () => patch({ titulo, descripcion, slack_url: slackUrl, jira }));
     if (j) onCambio(j.reporte);
   }
   async function revisar() {
@@ -261,14 +274,21 @@ function Detalle({
           <span className="text-xs text-ink-500">Descripción</span>
           <textarea className={clsx(campo, "mt-1 w-full")} rows={4} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </label>
-        <label className="md:col-span-2">
+        <label>
           <span className="text-xs text-ink-500">Link de Slack</span>
           <input className={clsx(campo, "mt-1 w-full")} value={slackUrl} onChange={(e) => setSlackUrl(e.target.value)} placeholder="https://…slack.com/archives/…" />
+        </label>
+        <label>
+          <span className="text-xs text-ink-500">Jira (clave o link; vacío si no tiene)</span>
+          <input className={clsx(campo, "mt-1 w-full")} value={jira} onChange={(e) => setJira(e.target.value)} placeholder="Ej. KFC-123 o https://…atlassian.net/browse/…" />
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button className={botonPrimario} onClick={guardarCambios} disabled={!sucio || ocupado !== null || !titulo.trim()}>
           {ocupado === "guardar" ? "Guardando…" : "Guardar cambios"}
+        </button>
+        <button className={botonSecundario} onClick={onResumen} disabled={ocupado !== null}>
+          ← Ver resumen
         </button>
         <p className="text-xs text-ink-500">
           Reportado {hace(r.created_at)}
@@ -374,6 +394,57 @@ function Detalle({
 }
 
 // ---------------------------------------------------------------------
+// Resumen compacto (lo primero que se ve al dar clic)
+// ---------------------------------------------------------------------
+function Resumen({
+  r,
+  comentariosN,
+  onDetalle,
+}: {
+  r: Reporte;
+  comentariosN: number;
+  onDetalle: () => void;
+}) {
+  const nuevas = nuevasRespuestas(r);
+  const urlJ = urlJira(r.jira);
+  return (
+    <div className="border-t border-ink-100 bg-ink-50/40 px-5 py-3">
+      {r.descripcion ? (
+        <p className="line-clamp-3 whitespace-pre-wrap text-sm text-ink-700">{r.descripcion}</p>
+      ) : (
+        <p className="text-sm text-ink-500">Sin descripción.</p>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        {r.jira && (
+          urlJ ? (
+            <a href={urlJ} target="_blank" rel="noreferrer" className={clsx(botonSecundario, "inline-block")}>
+              Jira {etiquetaJira(r.jira)} ↗
+            </a>
+          ) : (
+            <span className="rounded-lg border border-ink-200 bg-white px-3 py-1.5 font-medium text-ink-700">Jira {etiquetaJira(r.jira)}</span>
+          )
+        )}
+        {r.slack_url && (
+          <a href={r.slack_url} target="_blank" rel="noreferrer" className={clsx(botonSecundario, "inline-block")}>
+            Abrir en Slack ↗
+          </a>
+        )}
+        {!r.jira && !r.slack_url && <span className="text-ink-500">Sin enlace de seguimiento.</span>}
+        {comentariosN > 0 && (
+          <span className="text-ink-500">
+            💬 {comentariosN} comentario{comentariosN === 1 ? "" : "s"}
+          </span>
+        )}
+        {nuevas > 0 && <span className="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700">Slack +{nuevas} nuevas</span>}
+        <button className="ml-auto text-xs font-semibold text-brand-600 hover:underline" onClick={onDetalle}>
+          Ver todo el detalle →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
 // Pantalla completa
 // ---------------------------------------------------------------------
 type FiltroEstatus = "abiertos" | "todos" | EstatusReporte;
@@ -388,7 +459,10 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
   const [filtro, setFiltro] = useState<FiltroEstatus>("abiertos");
   const [busqueda, setBusqueda] = useState("");
   const [fPrioridad, setFPrioridad] = useState("");
+  const [fSeguimiento, setFSeguimiento] = useState("");
   const [abierto, setAbierto] = useState<number | null>(null);
+  // Reporte cuyo detalle completo está desplegado (el resto muestra solo el resumen)
+  const [completo, setCompleto] = useState<number | null>(null);
   const [creando, setCreando] = useState(false);
   const [autor, setAutor] = useState("");
   const [revisandoTodos, setRevisandoTodos] = useState(false);
@@ -459,14 +533,15 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
           (filtro === "todos" ? true : filtro === "abiertos" ? r.estatus !== "resuelto" : r.estatus === filtro)
       )
       .filter((r) => !fPrioridad || r.prioridad === fPrioridad)
-      .filter((r) => !q || `${r.titulo} ${r.descripcion ?? ""} ${r.reportado_por ?? ""}`.toLowerCase().includes(q))
+      .filter((r) => !fSeguimiento || seguimientoDe(r) === fSeguimiento)
+      .filter((r) => !q || `${r.titulo} ${r.descripcion ?? ""} ${r.reportado_por ?? ""} ${r.jira ?? ""}`.toLowerCase().includes(q))
       // Abiertos: lo más urgente primero; el resto, lo más reciente primero
       .sort((a, b) =>
         filtro === "abiertos" || filtro === "nuevo" || filtro === "en_proceso" || filtro === "en_espera"
           ? peso[a.prioridad] - peso[b.prioridad] || b.created_at.localeCompare(a.created_at)
           : b.created_at.localeCompare(a.created_at)
       );
-  }, [reportes, filtro, busqueda, fPrioridad, mantener, abierto]);
+  }, [reportes, filtro, busqueda, fPrioridad, fSeguimiento, mantener, abierto]);
 
   function reemplazar(r: Reporte, comentariosN?: number) {
     setReportes((lista) => lista.map((x) => (x.id === r.id ? r : x)));
@@ -558,6 +633,7 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
             setCreando(false);
             setFiltro("abiertos");
             setAbierto(r.id);
+            setCompleto(r.id);
           }}
         />
       )}
@@ -585,12 +661,20 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-3">
-            <input className={clsx(campo, "w-full sm:w-72")} placeholder="Buscar por título o descripción…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <input className={clsx(campo, "w-full sm:w-72")} placeholder="Buscar por título, descripción o Jira…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className={campo} value={fPrioridad} onChange={(e) => setFPrioridad(e.target.value)}>
               <option value="">Toda prioridad</option>
               {PRIORIDADES.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.label}
+                </option>
+              ))}
+            </select>
+            <select className={campo} value={fSeguimiento} onChange={(e) => setFSeguimiento(e.target.value)} aria-label="Seguimiento">
+              <option value="">Todo seguimiento</option>
+              {SEGUIMIENTOS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -611,13 +695,23 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
                   return (
                     <li key={r.id}>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
-                        <button className="min-w-0 flex-1 basis-64 text-left" onClick={() => setAbierto(abiertoEste ? null : r.id)} aria-expanded={abiertoEste}>
+                        <button className="min-w-0 flex-1 basis-64 text-left" onClick={() => { setAbierto(abiertoEste ? null : r.id); setCompleto(null); }} aria-expanded={abiertoEste}>
                           <p className={clsx("truncate text-sm font-semibold", r.estatus === "resuelto" ? "text-ink-500 line-through" : "text-ink-900")}>{r.titulo}</p>
                           <p className="mt-0.5 text-xs text-ink-500">
                             {[r.reportado_por, hace(r.created_at)].filter(Boolean).join(" · ")}
                             {(conteoCom[r.id] ?? 0) > 0 && ` · 💬 ${conteoCom[r.id]} comentario${conteoCom[r.id] === 1 ? "" : "s"}`}
                           </p>
                         </button>
+                        {seguimientoDe(r) === "jira" && (
+                          <span className="rounded-full bg-peri-50 px-2.5 py-1 text-xs font-semibold text-ink-800" title="Tiene ticket en Jira">
+                            Jira {etiquetaJira(r.jira)}
+                          </span>
+                        )}
+                        {seguimientoDe(r) === "solo_link" && (
+                          <span className="rounded-full bg-ink-50 px-2.5 py-1 text-xs font-medium text-ink-500" title="Solo tiene el link de Slack, sin Jira">
+                            Solo Slack
+                          </span>
+                        )}
                         {nuevas > 0 && (
                           <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700" title="Respuestas nuevas en Slack">
                             Slack +{nuevas}
@@ -653,7 +747,12 @@ export default function Reportes({ tipo }: { tipo: TipoReporte }) {
                           ))}
                         </select>
                       </div>
-                      {abiertoEste && <Detalle r={r} slackOk={slackOk} autor={autor} onAutor={cambiarAutor} onCambio={reemplazar} onBorrado={(id) => { setReportes((l) => l.filter((x) => x.id !== id)); setAbierto(null); }} />}
+                      {abiertoEste &&
+                        (completo === r.id ? (
+                          <Detalle r={r} slackOk={slackOk} autor={autor} onAutor={cambiarAutor} onCambio={reemplazar} onResumen={() => setCompleto(null)} onBorrado={(id) => { setReportes((l) => l.filter((x) => x.id !== id)); setAbierto(null); setCompleto(null); }} />
+                        ) : (
+                          <Resumen r={r} comentariosN={conteoCom[r.id] ?? 0} onDetalle={() => setCompleto(r.id)} />
+                        ))}
                     </li>
                   );
                 })}
