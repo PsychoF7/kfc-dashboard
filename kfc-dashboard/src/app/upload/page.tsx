@@ -5,6 +5,7 @@ import clsx from "clsx";
 import Papa from "papaparse";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { normalizeHeader } from "@/lib/parse/columns";
+import { ENCABEZADOS_GENERAL } from "@/lib/reembolsos";
 
 type Tipo = "ops" | "ventas" | "tiempos" | "rappi";
 
@@ -23,11 +24,11 @@ const FILAS_POR_LOTE = 2000;
 const LOTES_EN_PARALELO = 3;
 const COLUMNAS_TIENDA = ["restaurant", "restaurante", "nombre del restaurante", "picking point name"];
 
-async function enviarLote(cuerpo: Record<string, unknown>, intentos = 3) {
+async function enviarLote(cuerpo: Record<string, unknown>, intentos = 3, ruta = "/api/upload/lote") {
   let ultimoError = "No se pudo guardar una parte del archivo.";
   for (let i = 0; i < intentos; i++) {
     try {
-      const res = await fetch("/api/upload/lote", {
+      const res = await fetch(ruta, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(cuerpo),
@@ -274,6 +275,202 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
   );
 }
 
+// ---------------------------------------------------------------------
+// Reembolsos: el archivo general (o tu hoja de reembolsos) puede traer varias
+// hojas, con o sin encabezados. Se leen todas y solo se guarda lo de KFC.
+// ---------------------------------------------------------------------
+interface HojaReembolsos {
+  headers: string[];
+  datos: unknown[][];
+}
+
+/** Date de Excel -> "YYYY-MM-DD" (se suma 1 minuto: Excel a veces entrega 23:59:59 del día anterior). */
+function soloFecha(d: Date) {
+  const x = new Date(d.getTime() + 60000);
+  return `${x.getFullYear()}-${dos(x.getMonth() + 1)}-${dos(x.getDate())}`;
+}
+
+function detectarHoja(filas: unknown[][]): HojaReembolsos | null {
+  const llenas = filas.filter((f) => f.some((c) => c !== null && c !== undefined && String(c).trim() !== ""));
+  for (let i = 0; i < Math.min(10, llenas.length); i++) {
+    const n = llenas[i].map((c) => normalizeHeader(c));
+    if (n.includes("restaurante") && n.includes("monto")) {
+      return { headers: llenas[i].map((c) => String(c ?? "")), datos: llenas.slice(i + 1) };
+    }
+  }
+  // Sin encabezados: el formato general de 20 columnas
+  const ancho = Math.max(0, ...llenas.slice(0, 20).map((f) => f.length));
+  if (llenas.length > 0 && ancho >= 16) return { headers: ENCABEZADOS_GENERAL, datos: llenas };
+  return null;
+}
+
+async function leerHojasReembolsos(file: File): Promise<HojaReembolsos[]> {
+  let hojas: unknown[][][];
+  if (file.name.toLowerCase().endsWith(".csv")) {
+    hojas = [await leerCsv(file)];
+  } else {
+    const XLSX = await import("xlsx");
+    const libro = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+    hojas = libro.SheetNames.map((nombre) => {
+      const filas = XLSX.utils.sheet_to_json<unknown[]>(libro.Sheets[nombre], { header: 1, raw: true, defval: null });
+      return (filas as unknown[][]).map((fila) => fila.map((c) => (c instanceof Date ? soloFecha(c) : c)));
+    });
+  }
+  return hojas.map(detectarHoja).filter((h): h is HojaReembolsos => h !== null);
+}
+
+function ReembolsosCard() {
+  const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<"idle" | "reading" | "processing">("idle");
+  const [result, setResult] = useState<UploadResult | null>(null);
+  const [progreso, setProgreso] = useState<{ hechas: number; total: number } | null>(null);
+
+  async function cargar(f: File) {
+    setStage("reading");
+    await new Promise((r) => setTimeout(r, 50));
+    const hojas = await leerHojasReembolsos(f);
+    if (hojas.length === 0) {
+      throw new Error("No encontré reembolsos en el archivo. Revisa que tenga las columnas RESTAURANTE, MONTO y FOLIO.");
+    }
+    const preparadas = hojas
+      .map((h) => {
+        const idx = h.headers.findIndex((x) => normalizeHeader(x) === "restaurante");
+        const kfc = idx >= 0 ? h.datos.filter((r) => /kfc/i.test(String(r[idx] ?? ""))) : [];
+        return { headers: h.headers, kfc };
+      })
+      .filter((h) => h.kfc.length > 0);
+    const total = preparadas.reduce((s, h) => s + h.kfc.length, 0);
+    if (total === 0) throw new Error("El archivo no tiene ninguna fila de KFC.");
+
+    setStage("processing");
+    setProgreso({ hechas: 0, total });
+    let hechas = 0;
+    let guardadas = 0;
+    let fechaMin: string | null = null;
+    let fechaMax: string | null = null;
+    let uploadId: string | undefined;
+
+    // Una hoja a la vez (en orden), los lotes de cada hoja de 3 en 3
+    for (const h of preparadas) {
+      const lotes: unknown[][][] = [];
+      for (let i = 0; i < h.kfc.length; i += FILAS_POR_LOTE) lotes.push(h.kfc.slice(i, i + FILAS_POR_LOTE));
+      const anotar = (d: { guardadas: number; fecha_min: string | null; fecha_max: string | null; upload_id: string }, n: number) => {
+        uploadId = d.upload_id;
+        guardadas += d.guardadas;
+        if (d.fecha_min && (!fechaMin || d.fecha_min < fechaMin)) fechaMin = d.fecha_min;
+        if (d.fecha_max && (!fechaMax || d.fecha_max > fechaMax)) fechaMax = d.fecha_max;
+        hechas += n;
+        setProgreso({ hechas, total });
+      };
+      const base = { filename: f.name, headers: h.headers };
+      const enviar = (cuerpo: Record<string, unknown>) => enviarLote({ ...base, ...cuerpo }, 3, "/api/reembolsos/lote");
+      let siguiente = 0;
+      if (!uploadId) {
+        const primero = await enviar({ rows: lotes[0] });
+        anotar(primero, lotes[0].length);
+        siguiente = 1;
+      }
+      const trabajador = async () => {
+        while (siguiente < lotes.length) {
+          const i = siguiente++;
+          const d = await enviar({ rows: lotes[i], upload_id: uploadId });
+          anotar(d, lotes[i].length);
+        }
+      };
+      await Promise.all(Array.from({ length: LOTES_EN_PARALELO }, () => trabajador()));
+    }
+
+    await enviarLote({ filename: f.name, headers: [], upload_id: uploadId, final: { row_count: guardadas, date_start: fechaMin, date_end: fechaMax } }, 3, "/api/reembolsos/lote");
+    return {
+      ok: true,
+      rows_processed: guardadas,
+      date_range: fechaMin && fechaMax ? `${fechaMin} → ${fechaMax}` : null,
+    } as UploadResult;
+  }
+
+  async function handleUpload() {
+    if (!file) return;
+    setLoading(true);
+    setResult(null);
+    setProgreso(null);
+    try {
+      setResult(await cargar(file));
+      setFile(null);
+    } catch (e) {
+      setResult({ error: e instanceof Error ? e.message : "No se pudo cargar el archivo." });
+    } finally {
+      setLoading(false);
+      setStage("idle");
+      setProgreso(null);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
+      <h3 className="text-sm font-semibold text-ink-900">Reembolsos</h3>
+      <p className="mt-1 text-xs text-ink-500">El archivo general de reembolsos. Solo se guardan los de KFC.</p>
+
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f) setFile(f);
+        }}
+        className={clsx(
+          "mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors",
+          dragOver ? "border-brand-500 bg-brand-50" : "border-ink-200 bg-ink-50 hover:bg-ink-100"
+        )}
+      >
+        <input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <p className="text-sm font-medium text-ink-700">{file ? file.name : "Arrastra tu archivo aquí o haz clic para elegirlo"}</p>
+        <p className="mt-1 text-xs text-ink-500">Formatos: .xlsx o .csv (delimitado por comas)</p>
+      </label>
+
+      <button
+        onClick={handleUpload}
+        disabled={!file || loading}
+        className="mt-4 w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {stage === "reading" && "Leyendo archivo…"}
+        {stage === "processing" &&
+          (progreso
+            ? `Guardando… ${progreso.hechas.toLocaleString("es-MX")} de ${progreso.total.toLocaleString("es-MX")}`
+            : "Procesando filas…")}
+        {stage === "idle" && (loading ? "Procesando…" : "Cargar archivo")}
+      </button>
+
+      {progreso && (
+        <div className="mt-3">
+          <div className="h-2 w-full rounded-full bg-ink-100">
+            <div
+              className="h-2 rounded-full bg-brand-500 transition-all"
+              style={{ width: `${Math.round((progreso.hechas / Math.max(progreso.total, 1)) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {result?.ok && (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          ✓ {result.rows_processed?.toLocaleString("es-MX")} reembolsos guardados
+          {result.date_range ? ` · ${result.date_range}` : ""}
+        </div>
+      )}
+      {result?.error && (
+        <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{result.error}</div>
+      )}
+    </div>
+  );
+}
+
 export default function UploadPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -304,6 +501,7 @@ export default function UploadPage() {
           title="Reporte de Rappi KFC"
           description="El cargo_order_report que descargas de la plataforma de Rappi (Rappi exclusivo de KFC)."
         />
+        <ReembolsosCard />
       </div>
     </div>
   );
