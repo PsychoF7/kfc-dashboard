@@ -409,6 +409,67 @@ export default function ReembolsosPage() {
         </div>
       </Card>
 
+      {/* Resultados de la búsqueda */}
+      {buscarFinal && (
+        <>
+          <h2 className="mt-6 text-lg font-semibold text-ink-900">Resultados de la búsqueda</h2>
+          {detalle && (
+            <p className="mt-1 text-sm text-ink-500">
+              {int(detalle.total)} {detalle.total === 1 ? "reembolso" : "reembolsos"} · {money(detalle.monto)}
+            </p>
+          )}
+          {errorDetalle && <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorDetalle}</div>}
+          <Card className="mt-4 p-0">
+            <div className={clsx("overflow-x-auto", cargandoDetalle && "opacity-60")}>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
+                    <th className="px-4 py-3 font-medium">Fecha</th>
+                    <th className="px-4 py-3 font-medium">Sucursal</th>
+                    <th className="px-4 py-3 font-medium">Proveedor</th>
+                    <th className="px-4 py-3 text-right font-medium">Monto</th>
+                    <th className="px-4 py-3 font-medium">Folio</th>
+                    <th className="px-4 py-3 font-medium">Estatus</th>
+                    <th className="px-4 py-3 font-medium">Fecha de pago</th>
+                    <th className="px-4 py-3 font-medium">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(detalle?.filas ?? []).map((f) => (
+                    <tr key={f.clave} className="border-b border-ink-100 last:border-0">
+                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_venta)}</td>
+                      <td className="px-4 py-2 text-ink-900">{f.restaurante}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{f.proveedor ?? "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums">{money(f.monto)}</td>
+                      <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-ink-700">{f.folio ?? "—"}</td>
+                      <td className="px-4 py-2">
+                        <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", COLORES_ESTATUS[f.estatus.toLowerCase()] ?? "bg-ink-50 text-ink-700")}>{f.estatus}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_pago)}</td>
+                      <td className="px-4 py-2 text-ink-700">{f.motivo ?? "—"}</td>
+                    </tr>
+                  ))}
+                  {detalle && detalle.filas.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
+                        No encontré ningún reembolso con esa búsqueda.
+                      </td>
+                    </tr>
+                  )}
+                  {!detalle && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
+                        Cargando…
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+
       {/* Filtros */}
       <Card className="mt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -568,66 +629,6 @@ export default function ReembolsosPage() {
         )}
       </Card>
 
-      {/* Resultados de la búsqueda */}
-      {buscarFinal && (
-        <>
-          <h2 className="mt-12 text-lg font-semibold text-ink-900">Resultados de la búsqueda</h2>
-          {detalle && (
-            <p className="mt-1 text-sm text-ink-500">
-              {int(detalle.total)} {detalle.total === 1 ? "reembolso" : "reembolsos"} · {money(detalle.monto)}
-            </p>
-          )}
-          {errorDetalle && <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorDetalle}</div>}
-          <Card className="mt-4 p-0">
-            <div className={clsx("overflow-x-auto", cargandoDetalle && "opacity-60")}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
-                    <th className="px-4 py-3 font-medium">Fecha</th>
-                    <th className="px-4 py-3 font-medium">Sucursal</th>
-                    <th className="px-4 py-3 font-medium">Proveedor</th>
-                    <th className="px-4 py-3 text-right font-medium">Monto</th>
-                    <th className="px-4 py-3 font-medium">Folio</th>
-                    <th className="px-4 py-3 font-medium">Estatus</th>
-                    <th className="px-4 py-3 font-medium">Fecha de pago</th>
-                    <th className="px-4 py-3 font-medium">Motivo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(detalle?.filas ?? []).map((f) => (
-                    <tr key={f.clave} className="border-b border-ink-100 last:border-0">
-                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_venta)}</td>
-                      <td className="px-4 py-2 text-ink-900">{f.restaurante}</td>
-                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{f.proveedor ?? "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums">{money(f.monto)}</td>
-                      <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-ink-700">{f.folio ?? "—"}</td>
-                      <td className="px-4 py-2">
-                        <span className={clsx("rounded-full px-2 py-0.5 text-xs font-medium", COLORES_ESTATUS[f.estatus.toLowerCase()] ?? "bg-ink-50 text-ink-700")}>{f.estatus}</span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-ink-700">{fechaCorta(f.fecha_pago)}</td>
-                      <td className="px-4 py-2 text-ink-700">{f.motivo ?? "—"}</td>
-                    </tr>
-                  ))}
-                  {detalle && detalle.filas.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
-                        No encontré ningún reembolso con esa búsqueda.
-                      </td>
-                    </tr>
-                  )}
-                  {!detalle && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-ink-500">
-                        Cargando…
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </>
-      )}
     </div>
   );
 }
