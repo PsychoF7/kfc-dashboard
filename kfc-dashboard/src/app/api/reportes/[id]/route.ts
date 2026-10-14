@@ -26,6 +26,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
     if ("descripcion" in b) cambios.descripcion = texto(b.descripcion, 5000);
     if ("pantalla" in b) cambios.pantalla = texto(b.pantalla, 100);
+    if ("jira" in b) cambios.jira = texto(b.jira, 500);
     if ("slack_url" in b) {
       cambios.slack_url = texto(b.slack_url, 500);
       // Link nuevo = se borra lo que se había leído del anterior
