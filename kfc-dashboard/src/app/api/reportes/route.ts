@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       pantalla: texto(b.pantalla, 100),
       prioridad: esPrioridad(b.prioridad) ? b.prioridad : "media",
       slack_url: texto(b.slack_url, 500),
+      jira: texto(b.jira, 500),
       reportado_por: texto(b.reportado_por, 100),
     };
     const supabase = getSupabaseAdmin();
