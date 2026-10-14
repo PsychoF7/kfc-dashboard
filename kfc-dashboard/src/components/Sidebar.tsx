@@ -26,6 +26,7 @@ const AVAILABLE = [
   { href: "/flotilla", label: "Mi Flotilla", icono: <Icono><circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" /><path d="M6 17h5l3-8h3" /><path d="M10 6h3" /></Icono> },
   { href: "/franquicias", label: "Franquicias", icono: <Icono><path d="M3 10 4.5 4h15L21 10" /><path d="M4 10v10h16V10" /><path d="M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" /><path d="M10 20v-5h4v5" /></Icono> },
   { href: "/rappi", label: "Rappi", icono: <Icono><path d="M3 9h18l-1.5 10a2 2 0 0 1-2 1.7H6.5a2 2 0 0 1-2-1.7z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" /></Icono> },
+  { href: "/reembolsos", label: "Reembolsos", icono: <Icono><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v8M9.5 14.2c.5.9 1.4 1.3 2.5 1.3 1.4 0 2.5-.7 2.5-1.8 0-2.3-5-1.2-5-3.5 0-1 1-1.7 2.5-1.7 1 0 1.9.4 2.4 1.2" /></Icono> },
   { href: "/bugs", label: "Bugs", icono: <Icono><path d="M9 9V7a3 3 0 0 1 6 0v2" /><rect x="7" y="9" width="10" height="11" rx="5" /><path d="M12 13v4M3 13h4M17 13h4M4.5 6.5 7.5 9M19.5 6.5 16.5 9M4.5 19.5 7.5 17M19.5 19.5 16.5 17" /></Icono> },
   { href: "/usuarios", label: "Usuarios y permisos", icono: <Icono><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></Icono> },
   { href: "/desarrollos", label: "Solicitudes de desarrollo", icono: <Icono><path d="m8 8-5 4 5 4" /><path d="m16 8 5 4-5 4" /><path d="m14 5-4 14" /></Icono> },
@@ -36,7 +37,6 @@ const AVAILABLE = [
 const ROADMAP = [
   { label: "Avisos y actualizaciones", href: "/avisos" },
   { label: "Altas y bajas", href: "/altas-bajas" },
-  { label: "Reembolsos", href: "/reembolsos" },
   { label: "Materiales", href: "/materiales" },
 ];
 
