@@ -17,6 +17,7 @@ import {
 } from "@/lib/devoluciones";
 import DetalleDia, { DetalleDiaVacio, buscarPrevio, type FilaDia } from "@/components/DetalleDia";
 import Incidencias from "./Incidencias";
+import { useEsConsulta } from "@/components/Sesion";
 import { colorPct, type MetricaMapa, type TiendaMapa } from "./MapaDevoluciones";
 
 // Leaflet solo corre en el navegador
@@ -283,6 +284,8 @@ function Barra({ valor, max, color = "bg-brand-500" }: { valor: number; max: num
 // Panorama
 // ---------------------------------------------------------------------
 export default function Panorama() {
+  // KFC (consulta) no ve el desglose por repartidor
+  const ocultarRepartidor = useEsConsulta();
   const [opciones, setOpciones] = useState<FilterOptions | null>(null);
   const [rango, setRango] = useState<RangoData | null>(null);
   // Mismos filtros que el panel principal; sin fechas = toda la data
@@ -642,7 +645,7 @@ export default function Panorama() {
       </div>
 
       {/* Motivos, repartidor, zonas */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className={clsx("mt-6 grid grid-cols-1 gap-6", ocultarRepartidor ? "lg:grid-cols-2" : "lg:grid-cols-3")}>
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <h2 className="text-sm font-semibold text-ink-900">Motivos de cancelación y rechazo</h2>
           <ul className="mt-4 space-y-3">
@@ -659,6 +662,7 @@ export default function Panorama() {
           </ul>
         </div>
 
+        {!ocultarRepartidor && (
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <h2 className="text-sm font-semibold text-ink-900">Por repartidor</h2>
           <div className="mt-3 overflow-x-auto">
@@ -686,6 +690,8 @@ export default function Panorama() {
             </table>
           </div>
         </div>
+
+        )}
 
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <h2 className="text-sm font-semibold text-ink-900">Por zona</h2>
