@@ -3,6 +3,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
+import { useEsConsulta } from "@/components/Sesion";
 import type { FilterOptions } from "@/lib/types";
 import {
   ALCANCES_INCIDENCIA,
@@ -85,6 +86,7 @@ export default function Incidencias({
   onCambio: () => void;
   onClimaCambio: () => void;
 }) {
+  const lectura = useEsConsulta();
   const [verDescartados, setVerDescartados] = useState(false);
   const [verTodosDias, setVerTodosDias] = useState(false);
   const [climaAbierto, setClimaAbierto] = useState(false);
@@ -156,7 +158,7 @@ export default function Incidencias({
             intermitencias, bugs… Se marcan en la gráfica y salen en el resumen y el Excel de la semana.
           </p>
         </div>
-        {!borrador && (
+        {!borrador && !lectura && (
           <button
             onClick={() => {
               setError(null);
@@ -296,7 +298,7 @@ export default function Incidencias({
                     <p className="mt-0.5 text-sm text-ink-700">{i.descripcion}</p>
                   </div>
                 </div>
-                <div className="flex flex-shrink-0 items-center gap-2 text-xs">
+                <div className={clsx("flex flex-shrink-0 items-center gap-2 text-xs", lectura && "hidden")}>
                   {borrando === i.id ? (
                     <>
                       <span className="text-ink-500">¿Borrar?</span>
@@ -388,10 +390,10 @@ export default function Incidencias({
                         {impactoClima(c) && <p className="text-xs text-ink-500">{impactoClima(c)}</p>}
                       </div>
                       <div className="flex items-center gap-3">
-                        <NotaClima c={c} onGuardar={(nota) => actualizarClima(c, { nota })} />
+                        {!lectura && <NotaClima c={c} onGuardar={(nota) => actualizarClima(c, { nota })} />}
                         <button
                           onClick={() => actualizarClima(c, { descartado: true }).catch(() => undefined)}
-                          className="whitespace-nowrap text-xs font-medium text-ink-500 hover:underline"
+                          className={clsx("whitespace-nowrap text-xs font-medium text-ink-500 hover:underline", lectura && "hidden")}
                         >
                           No afectó
                         </button>
@@ -428,7 +430,7 @@ export default function Incidencias({
                     </span>
                     <button
                       onClick={() => actualizarClima(c, { descartado: false }).catch(() => undefined)}
-                      className="font-medium text-brand-600 hover:underline"
+                      className={clsx("font-medium text-brand-600 hover:underline", lectura && "hidden")}
                     >
                       Sí afectó
                     </button>
