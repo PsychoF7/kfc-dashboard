@@ -13,6 +13,7 @@ export interface Reporte {
   prioridad: PrioridadReporte;
   estatus: EstatusReporte;
   slack_url: string | null;
+  jira: string | null;
   slack_respuestas: number | null;
   slack_ultima_respuesta: string | null;
   slack_ultimo_autor: string | null;
@@ -61,7 +62,7 @@ export const PANTALLAS = [
 ];
 
 export const COLUMNAS_REPORTE =
-  "id, tipo, titulo, descripcion, pantalla, prioridad, estatus, slack_url, slack_respuestas, slack_ultima_respuesta, slack_ultimo_autor, slack_ultimo_texto, slack_resuelto, slack_visto_respuestas, slack_revisado_en, slack_error, reportado_por, created_at, updated_at, resuelto_en";
+  "id, tipo, titulo, descripcion, pantalla, prioridad, estatus, slack_url, jira, slack_respuestas, slack_ultima_respuesta, slack_ultimo_autor, slack_ultimo_texto, slack_resuelto, slack_visto_respuestas, slack_revisado_en, slack_error, reportado_por, created_at, updated_at, resuelto_en";
 
 export function esEstatus(v: unknown): v is EstatusReporte {
   return ESTATUS.some((e) => e.id === v);
@@ -71,4 +72,34 @@ export function esPrioridad(v: unknown): v is PrioridadReporte {
 }
 export function esTipo(v: unknown): v is TipoReporte {
   return v === "bug" || v === "desarrollo";
+}
+
+// ¿Cómo se le da seguimiento? Con Jira, solo con el link de Slack, o sin ningún enlace.
+export type Seguimiento = "jira" | "solo_link" | "ninguno";
+
+export const SEGUIMIENTOS: { id: Seguimiento; label: string }[] = [
+  { id: "jira", label: "Con Jira" },
+  { id: "solo_link", label: "Solo link de Slack" },
+  { id: "ninguno", label: "Sin enlace" },
+];
+
+export function seguimientoDe(r: Pick<Reporte, "jira" | "slack_url">): Seguimiento {
+  if (r.jira && r.jira.trim()) return "jira";
+  if (r.slack_url && r.slack_url.trim()) return "solo_link";
+  return "ninguno";
+}
+
+/** Si lo guardado en "Jira" es un link, regresa el link; si es solo la clave (ej. KFC-123), null. */
+export function urlJira(j: string | null | undefined): string | null {
+  const t = (j ?? "").trim();
+  return /^https?:\/\//i.test(t) ? t : null;
+}
+
+/** Texto corto para mostrar: la clave del ticket (KFC-123) o "Jira". */
+export function etiquetaJira(j: string | null | undefined): string {
+  const t = (j ?? "").trim();
+  if (!t) return "";
+  const m = t.match(/[A-Z][A-Z0-9]+-\d+/);
+  if (m) return m[0];
+  return urlJira(t) ? "Jira" : t.slice(0, 24);
 }
