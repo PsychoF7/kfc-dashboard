@@ -1,5 +1,6 @@
 "use client";
 
+import { useEsConsulta } from "@/components/Sesion";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { getWeekRange } from "@/lib/week";
@@ -275,7 +276,7 @@ function TablaDuplicados({
 // ---------------------------------------------------------------------
 // Página
 // ---------------------------------------------------------------------
-export default function DevolucionesPage() {
+function DevolucionesCompleta() {
   const [anchorDate, setAnchorDate] = useState(semanaPasada);
   const [reporte, setReporte] = useState<DevReporte | null>(null);
   const [tendencia, setTendencia] = useState<DevSemanaTendencia[]>([]);
@@ -885,6 +886,19 @@ export default function DevolucionesPage() {
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+/** KFC (consulta) ve solo el panorama; el reporte semanal es para el equipo. */
+export default function DevolucionesPage() {
+  const esConsulta = useEsConsulta();
+  if (!esConsulta) return <DevolucionesCompleta />;
+  return (
+    <div className="mx-auto max-w-7xl px-6 py-8">
+      <h1 className="text-xl font-semibold text-ink-900">Devoluciones y cancelaciones</h1>
+      <p className="mt-1 text-sm text-ink-500">Panorama general de devueltas y canceladas. Meta de diciembre: 2%.</p>
+      <Panorama />
     </div>
   );
 }
