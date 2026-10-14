@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { COOKIE, DURACION_SEG, firmarSesion } from "@/lib/sesion";
+import { COOKIE, DURACION_LARGA_SEG, DURACION_SEG, firmarSesion } from "@/lib/sesion";
 import { esRol } from "@/lib/permisos";
 
 export const runtime = "nodejs";
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const email = String(body?.email ?? "").trim().toLowerCase();
     const password = String(body?.password ?? "");
+    const duracion = body?.recordar === true ? DURACION_LARGA_SEG : DURACION_SEG;
     if (!email || !password) {
       return NextResponse.json({ error: "Escribe tu correo y tu contraseña." }, { status: 400 });
     }
@@ -52,14 +53,14 @@ export async function POST(req: Request) {
       email,
       nombre: perfil.nombre || email,
       rol: perfil.rol,
-    });
+    }, duracion);
     const res = NextResponse.json({ ok: true, rol: perfil.rol });
     res.cookies.set(COOKIE, valor, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: DURACION_SEG,
+      maxAge: duracion,
     });
     return res;
   } catch (err) {
