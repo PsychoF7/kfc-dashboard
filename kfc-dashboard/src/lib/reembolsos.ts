@@ -18,6 +18,9 @@ export const REEMBOLSOS_COLUMNS: ColumnDef[] = [
   { key: "dictamen", aliases: ["DICTAMEN REEMBOLSO", "DICTAMEN"], type: "text" },
 ];
 
+// Solo se guardan reembolsos desde esta fecha (2025 se registró con nombres de tienda inconsistentes).
+export const FECHA_MINIMA = "2026-01-01";
+
 export const REEMBOLSOS_REQUERIDAS = ["restaurante", "monto", "folio"] as const;
 
 // Orden de columnas de la hoja general cuando viene SIN encabezados.
@@ -127,6 +130,11 @@ export function prepararReembolsos(headers: string[], rows: unknown[][]): Result
     const fecha = aFecha(v.fecha_venta);
     const monto = typeof v.monto === "number" ? v.monto : null;
     const tienda = tiendaClave(restaurante);
+    // Sin número de tienda (ej. solo "KFC") o fuera del periodo: no se guarda
+    if (!/^\d+$/.test(tienda) || !fecha || fecha < FECHA_MINIMA) {
+      omitidas++;
+      continue;
+    }
     const clave = idOrden && idOrden.length >= 8 ? idOrden : folio ? `f:${folio}|${fecha ?? ""}|${monto ?? ""}|${tienda}` : "";
     if (!clave) {
       omitidas++;
