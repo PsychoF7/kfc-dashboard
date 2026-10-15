@@ -22,7 +22,7 @@ export function esRol(v: unknown): v is Rol {
 }
 
 // Páginas que ve "consulta" (la ruta exacta o cualquiera que cuelgue de ella).
-const PAGINAS_CONSULTA = ["/dashboard", "/devoluciones", "/tiempos", "/flotilla", "/reembolsos", "/materiales", "/avisos"];
+const PAGINAS_CONSULTA = ["/dashboard", "/devoluciones", "/tiempos", "/flotilla", "/reembolsos", "/altas-bajas", "/materiales", "/avisos"];
 
 // Rutas de datos que "consulta" puede LEER (solo GET).
 const APIS_CONSULTA_GET = [
@@ -38,6 +38,7 @@ const APIS_CONSULTA_GET = [
   "/api/reembolsos/filtros",
   "/api/reembolsos/panorama",
   "/api/reembolsos/detalle",
+  "/api/altas-bajas",
 ];
 
 function empieza(ruta: string, base: string) {
