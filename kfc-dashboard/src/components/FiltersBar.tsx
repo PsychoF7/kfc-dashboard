@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { DashboardFilters, FilterOptions } from "@/lib/types";
 import MultiSelectFilter from "./MultiSelectFilter";
 import PriceRangeInput from "./PriceRangeInput";
@@ -9,6 +10,30 @@ interface FiltersBarProps {
   filters: DashboardFilters;
   onChange: (filters: DashboardFilters) => void;
   onClear: () => void;
+}
+
+// Solo avisa el cambio cuando la fecha está completa y es razonable; mientras se
+// escribe el año (0002, 0020...) no se consulta nada.
+function CampoFecha({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [texto, setTexto] = useState(value);
+  useEffect(() => setTexto(value), [value]);
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-ink-500">{label}</label>
+      <input
+        type="date"
+        min="2020-01-01"
+        max="2100-12-31"
+        className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        value={texto}
+        onChange={(e) => {
+          const v = e.target.value;
+          setTexto(v);
+          if (v === "" || /^20\d\d-\d\d-\d\d$/.test(v)) onChange(v);
+        }}
+      />
+    </div>
+  );
 }
 
 export default function FiltersBar({ options, filters, onChange, onClear }: FiltersBarProps) {
@@ -28,24 +53,8 @@ export default function FiltersBar({ options, filters, onChange, onClear }: Filt
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-ink-500">Desde</label>
-          <input
-            type="date"
-            className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            value={filters.date_from}
-            onChange={(e) => set("date_from", e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-ink-500">Hasta</label>
-          <input
-            type="date"
-            className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            value={filters.date_to}
-            onChange={(e) => set("date_to", e.target.value)}
-          />
-        </div>
+        <CampoFecha label="Desde" value={filters.date_from} onChange={(v) => set("date_from", v)} />
+        <CampoFecha label="Hasta" value={filters.date_to} onChange={(v) => set("date_to", v)} />
 
         <MultiSelectFilter
           label="Ciudad"
