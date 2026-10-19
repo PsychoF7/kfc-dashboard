@@ -42,6 +42,11 @@ export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
   try {
     const data = await conCache("dev-panorama", params, async () => {
+      // Completa la ubicación de tiendas nuevas (una sola vez por carga de data)
+      await supabase.rpc("completar_tienda_ubicacion").then(
+        () => undefined,
+        () => undefined
+      );
       const { data, error } = await withRetryResult(() => supabase.rpc("get_dev_panorama_ops", params));
       if (error) throw new Error(error.message);
       return data ?? {};
