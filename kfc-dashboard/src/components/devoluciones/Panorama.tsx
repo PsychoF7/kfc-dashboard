@@ -339,19 +339,32 @@ export default function Panorama() {
   }, [filtros, incluirReturning, incluirRechazadas]);
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const ctl = new AbortController();
+    const t = setTimeout(async () => {
       setLoading(true);
       setError(null);
-      fetch(`/api/devoluciones/panorama?${query}`, { cache: "no-store" })
-        .then((r) => r.json())
-        .then((res) => {
+      // Un reintento automático por si la base tardó o se cortó la conexión
+      for (let intento = 0; intento < 2; intento++) {
+        try {
+          const r = await fetch(`/api/devoluciones/panorama?${query}`, { cache: "no-store", signal: ctl.signal });
+          const res = await r.json();
           if (res?.error) throw new Error(res.error);
           setData(res?.kpis ? res : null);
-        })
-        .catch((e) => setError(e.message ?? "No se pudo cargar el panorama."))
-        .finally(() => setLoading(false));
+          setLoading(false);
+          return;
+        } catch (e) {
+          if (ctl.signal.aborted) return;
+          if (intento === 1) {
+            setError(e instanceof Error ? e.message : "No se pudo cargar el panorama.");
+            setLoading(false);
+          }
+        }
+      }
     }, 400);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
   }, [query]);
 
   // Incidencias que tocan el periodo que se está mostrando
