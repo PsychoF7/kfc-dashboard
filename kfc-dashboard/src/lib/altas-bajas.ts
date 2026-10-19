@@ -21,7 +21,6 @@ export const PASOS: Record<TipoMov, { id: string; nombre: string }[]> = {
     { id: "confirmacion", nombre: "Confirmación de alta y permisos" },
   ],
   cambio: [
-    { id: "correo", nombre: "Solicitud de cambio en correo" },
     { id: "envio", nombre: "Configuración básica de envío" },
     { id: "pos", nombre: "Configuración POS (usuarios)" },
     { id: "confirmacion", nombre: "Confirmación de cambio y permisos" },
@@ -104,6 +103,7 @@ export interface Sucursal {
   actual: Movimiento; // último movimiento
   baja: boolean;
   producto: string;
+  fechaAlta: string | null; // cuándo se solicitó el alta (o el primer movimiento)
   historial: Movimiento[]; // del más reciente al más antiguo
   cambios: number;
   ultimoCambio: Movimiento | null;
@@ -129,8 +129,10 @@ export function agruparSucursales(movs: Movimiento[]): Sucursal[] {
     const actual = orden[orden.length - 1];
     const historial = [...orden].reverse();
     const cambiosLista = historial.filter((m) => m.tipo === "cambio");
+    const primeraAlta = orden.find((m) => m.tipo === "alta") ?? orden[0];
     lista.push({
       clave,
+      fechaAlta: primeraAlta.fecha_solicitud,
       nombre: actual.sucursal,
       actual,
       baja: actual.tipo === "baja",
@@ -140,5 +142,5 @@ export function agruparSucursales(movs: Movimiento[]): Sucursal[] {
       ultimoCambio: cambiosLista[0] ?? null,
     });
   }
-  return lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
+  return lista.sort((a, b) => (a.fechaAlta ?? "9999").localeCompare(b.fechaAlta ?? "9999") || a.nombre.localeCompare(b.nombre, "es", { numeric: true }));
 }
