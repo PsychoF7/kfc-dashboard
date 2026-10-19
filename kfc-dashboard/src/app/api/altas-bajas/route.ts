@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         .select(COLUMNAS_COMPLETAS)
         .single()
     );
+    if (error?.code === "23505") return NextResponse.json({ error: "Ya existe ese movimiento (misma sucursal, producto y fecha de solicitud)." }, { status: 409 });
     if (error) throw new Error(error.message);
     return NextResponse.json({ movimiento: data });
   } catch (err) {
