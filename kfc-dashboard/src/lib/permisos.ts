@@ -22,7 +22,7 @@ export function esRol(v: unknown): v is Rol {
 }
 
 // Páginas que ve "consulta" (la ruta exacta o cualquiera que cuelgue de ella).
-const PAGINAS_CONSULTA = ["/dashboard", "/devoluciones", "/tiempos", "/flotilla", "/reembolsos", "/altas-bajas", "/materiales", "/avisos"];
+const PAGINAS_CONSULTA = ["/dashboard", "/devoluciones", "/tiempos", "/flotilla", "/reembolsos", "/altas-bajas", "/credenciales", "/materiales", "/avisos"];
 
 // Rutas de datos que "consulta" puede LEER (solo GET).
 const APIS_CONSULTA_GET = [
@@ -39,6 +39,7 @@ const APIS_CONSULTA_GET = [
   "/api/reembolsos/panorama",
   "/api/reembolsos/detalle",
   "/api/altas-bajas",
+  "/api/credenciales",
 ];
 
 function empieza(ruta: string, base: string) {
@@ -57,6 +58,10 @@ export function paginaPermitida(rol: Rol, ruta: string): boolean {
 export function apiPermitida(rol: Rol, ruta: string, metodo: string): boolean {
   if (empieza(ruta, "/api/auth")) return true;
   if (empieza(ruta, "/api/usuarios")) return rol === "admin";
+  // Credenciales: los códigos y los usuarios master son solo del administrador;
+  // canjear un código lo puede hacer cualquier rol (así KFC ve los master).
+  if (ruta === "/api/credenciales/master/revelar") return metodo === "POST";
+  if (empieza(ruta, "/api/credenciales/codigos") || empieza(ruta, "/api/credenciales/master")) return rol === "admin";
   if (rol === "admin" || rol === "editor") return true;
   if (metodo !== "GET" && metodo !== "HEAD") return false;
   return APIS_CONSULTA_GET.some((p) => empieza(ruta, p));
