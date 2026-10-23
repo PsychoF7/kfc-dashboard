@@ -319,3 +319,70 @@ a.bg-brand-500 {
 .dark .text-brand-600:hover {
   color: rgb(var(--brand-900));
 }
+
+/* =====================================================================
+   Interacción también en modo claro (mismo comportamiento, tonos suaves).
+   Las reglas de ".dark" de arriba tienen prioridad en modo oscuro.
+   ===================================================================== */
+body {
+  background-image: radial-gradient(900px 380px at 50% -160px, rgb(137 29 255 / 0.08), transparent 70%),
+    radial-gradient(700px 480px at 100% 100%, rgb(125 143 255 / 0.06), transparent 70%);
+  background-attachment: fixed;
+}
+aside nav a.bg-brand-50 {
+  box-shadow: inset 0 0 0 1px rgb(137 29 255 / 0.22), 0 6px 16px -8px rgb(137 29 255 / 0.45);
+}
+.shadow-card {
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.shadow-card:hover {
+  border-color: rgb(137 29 255 / 0.4);
+  box-shadow: 0 0 0 1px rgb(137 29 255 / 0.1), 0 14px 34px -14px rgb(137 29 255 / 0.35);
+}
+.shadow-card:has(> .h-1:first-child):hover {
+  transform: translateY(-3px);
+}
+main .shadow-card {
+  animation: subir-suave 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+main .shadow-card:nth-child(2) { animation-delay: 0.04s; }
+main .shadow-card:nth-child(3) { animation-delay: 0.08s; }
+main .shadow-card:nth-child(4) { animation-delay: 0.12s; }
+main .shadow-card:nth-child(5) { animation-delay: 0.16s; }
+main .shadow-card:nth-child(n + 6) { animation-delay: 0.2s; }
+tbody tr {
+  transition: background-color 0.15s ease;
+}
+tbody tr:hover {
+  background-color: rgb(137 29 255 / 0.05);
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+select,
+textarea {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus,
+select:focus,
+textarea:focus {
+  border-color: rgb(137 29 255);
+  box-shadow: 0 0 0 3px rgb(137 29 255 / 0.15);
+}
+button.bg-brand-500,
+a.bg-brand-500,
+label.bg-brand-500 {
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+button.bg-brand-500:hover,
+a.bg-brand-500:hover {
+  box-shadow: 0 8px 22px -6px rgb(137 29 255 / 0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+  main .shadow-card {
+    animation: none;
+  }
+  .shadow-card,
+  .shadow-card:hover {
+    transition: none;
+    transform: none;
+  }
+}
