@@ -40,13 +40,9 @@ function Formulario() {
   return (
     <form onSubmit={entrar} className="w-full max-w-sm rounded-2xl border border-ink-100 bg-white p-8 shadow-card">
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-peri text-sm font-bold text-white">
-          KFC
-        </div>
-        <div>
-          <p className="font-display text-base font-semibold text-ink-900">Panel Operativo</p>
-          <p className="text-xs text-ink-500">Ambit · Delivery</p>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="Panel Operativo" width={44} height={44} className="h-11 w-11 rounded-xl" />
+        <p className="font-display text-base font-semibold text-ink-900">Panel Operativo</p>
       </div>
 
       <h1 className="font-display mt-7 text-xl font-semibold text-ink-900">Iniciar sesión</h1>
