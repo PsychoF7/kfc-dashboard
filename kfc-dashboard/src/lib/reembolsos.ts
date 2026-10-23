@@ -112,6 +112,8 @@ export interface ResultadoParseo {
 export function prepararReembolsos(headers: string[], rows: unknown[][]): ResultadoParseo {
   const mapeadas = mapRows(headers, rows, REEMBOLSOS_COLUMNS);
   const unicas = new Map<string, FilaReembolso>();
+  // Un mismo ID de orden con folios distintos = reembolso dividido en varios: cada folio cuenta aparte.
+  const folioDeOrden = new Map<string, string>();
   let noKfc = 0;
   let omitidas = 0;
 
@@ -135,7 +137,12 @@ export function prepararReembolsos(headers: string[], rows: unknown[][]): Result
       omitidas++;
       continue;
     }
-    const clave = idOrden && idOrden.length >= 8 ? idOrden : folio ? `f:${folio}|${fecha ?? ""}|${monto ?? ""}|${tienda}` : "";
+    let clave = idOrden && idOrden.length >= 8 ? idOrden : folio ? `f:${folio}|${fecha ?? ""}|${monto ?? ""}|${tienda}` : "";
+    if (idOrden && idOrden.length >= 8 && folio) {
+      const primero = folioDeOrden.get(idOrden);
+      if (primero === undefined) folioDeOrden.set(idOrden, folio);
+      else if (primero !== folio) clave = `${idOrden}|${folio}`;
+    }
     if (!clave) {
       omitidas++;
       continue;
