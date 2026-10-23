@@ -105,13 +105,11 @@ export default function Sidebar() {
       )}
     >
       <div className={clsx("flex items-center border-b border-ink-100 py-5", contraido ? "justify-center px-2" : "gap-3 px-5")}>
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-peri text-sm font-bold text-white">
-          KFC
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="Panel Operativo" width={40} height={40} className="h-10 w-10 flex-shrink-0 rounded-xl" />
         {!contraido && (
           <div className="min-w-0">
             <p className="font-display truncate text-sm font-semibold text-ink-900">Panel Operativo</p>
-            <p className="truncate text-xs text-ink-500">Ambit · Delivery</p>
           </div>
         )}
       </div>
