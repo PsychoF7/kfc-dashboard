@@ -35,7 +35,20 @@ export async function POST(req: Request) {
           })
           .eq("id", body.upload_id!)
       );
-      return NextResponse.json({ ok: true });
+      // Espejo del archivo: se quitan las filas del mismo periodo que ya no vienen en este archivo
+      let eliminadas = 0;
+      if (body.final.row_count > 0 && body.final.date_start && body.final.date_end) {
+        const { data, error } = await withRetryResult(() =>
+          supabase.rpc("sincronizar_reembolsos", {
+            p_batch: body.upload_id,
+            p_desde: body.final!.date_start,
+            p_hasta: body.final!.date_end,
+          })
+        );
+        if (error) throw new Error(error.message);
+        eliminadas = Number(data ?? 0);
+      }
+      return NextResponse.json({ ok: true, eliminadas });
     }
 
     const headers = body.headers ?? [];
