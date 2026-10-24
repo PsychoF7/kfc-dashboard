@@ -249,9 +249,6 @@ function GraficaHora({ datos }: { datos: TiemposPanorama["por_hora"] }) {
           <p className="mt-1 text-ink-500">{int(sel.ordenes)} órdenes completadas</p>
         </div>
       )}
-      <p className="mt-2 text-xs text-ink-500">
-        Barras = tiempo total promedio por hora en que se creó la orden (0 a 23 h). La línea roja es la meta de 45 min.
-      </p>
     </div>
   );
 }
@@ -344,10 +341,6 @@ function ZonasRojas({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-ink-500">
-          Marca zonas, ciudades o tiendas conflictivas (inseguridad, accesos difíciles, bloqueos frecuentes). Salen con
-          borde rojo punteado en el mapa y marcadas en el ranking.
-        </p>
         {!borrador && !lectura && (
           <button
             onClick={() => {
@@ -684,12 +677,10 @@ export default function TiemposPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <h2 className="text-sm font-semibold text-ink-900">Tendencia por día</h2>
-          <p className="mt-1 text-xs text-ink-500">Pasa el mouse para ver el detalle de cada día.</p>
           <div className="mt-3">{data ? <GraficaDia datos={data.por_dia} /> : <div className="h-60 animate-pulse rounded-lg bg-ink-50" />}</div>
         </Card>
         <Card>
           <h2 className="text-sm font-semibold text-ink-900">Tendencia por hora</h2>
-          <p className="mt-1 text-xs text-ink-500">Para ubicar los horarios críticos.</p>
           <div className="mt-3">{data ? <GraficaHora datos={data.por_hora} /> : <div className="h-60 animate-pulse rounded-lg bg-ink-50" />}</div>
         </Card>
       </div>
@@ -699,9 +690,6 @@ export default function TiemposPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-ink-900">Mapa de tiendas</h2>
-              <p className="mt-1 text-xs text-ink-500">
-                Color = minutos hasta que el repartidor sale con la orden. Tamaño = órdenes. Borde rojo punteado = zona roja.
-              </p>
             </div>
             <label className="flex items-center gap-2 text-xs text-ink-500">
               Mínimo de órdenes
@@ -776,7 +764,6 @@ export default function TiemposPage() {
 
       {/* ====================== DETALLE (DESPLEGABLE) ====================== */}
       <h2 className="mt-12 text-lg font-semibold text-ink-900">Detalle</h2>
-      <p className="mt-1 text-sm text-ink-500">Abre cada sección para ver el análisis completo.</p>
 
       <div className="mt-4 space-y-4">
         <Seccion
@@ -797,10 +784,7 @@ export default function TiemposPage() {
           {data?.etapas.detalle && data.etapas.detalle.ordenes > 0 && (
             <>
               <p className="mt-6 text-sm font-medium text-ink-900">
-                Detalle por etapa (Rappi y flotilla, {int(data.etapas.detalle.ordenes)} órdenes)
-              </p>
-              <p className="text-xs text-ink-500">
-                En Uber la plataforma no separa asignación, llegada y espera; por eso este detalle solo sale donde sí viene.
+                Detalle por etapa
               </p>
               <div className="mt-2">
                 <BarraEtapas
@@ -817,12 +801,10 @@ export default function TiemposPage() {
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <p className="text-sm font-medium text-ink-900">Más tardan en entregar la orden al repartidor</p>
-              <p className="text-xs text-ink-500">Espera exacta en tienda (mínimo 10 órdenes con el dato).</p>
               <TablaSimple filas={esperaExacta} valor={(t) => t.espera_prom} n={(t) => t.n_espera} esZonaRoja={esZonaRoja} />
             </div>
             <div>
               <p className="text-sm font-medium text-ink-900">Más tardan en asignar repartidor</p>
-              <p className="text-xs text-ink-500">Tiempo de asignación (Rappi y flotilla, mínimo 10 órdenes).</p>
               <TablaSimple filas={asignacion} valor={(t) => t.asignacion_prom} n={(t) => t.n_espera} esZonaRoja={esZonaRoja} />
             </div>
           </div>
@@ -971,11 +953,6 @@ export default function TiemposPage() {
                   </span>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-ink-500">
-                Columnas = hora del día (0 a 23 h). Zonas con al menos 150 órdenes; celdas con al menos 10. La velocidad es
-                aproximada: se calcula con la distancia en línea entre cliente y tienda, así que sirve para comparar
-                zonas y horas entre sí, no como velocidad real.
-              </p>
             </>
           )}
         </Seccion>
@@ -1025,10 +1002,6 @@ export default function TiemposPage() {
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-ink-500">
-            Incluye órdenes completadas y devueltas. Entre más tarda la orden en salir de la tienda, más probable es que el
-            cliente ya no la reciba.
-          </p>
         </Seccion>
       </div>
     </div>
