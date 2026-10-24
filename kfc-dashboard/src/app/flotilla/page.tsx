@@ -363,9 +363,6 @@ export default function FlotillaPage() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <h1 className="text-xl font-semibold text-ink-900">Mi Flotilla</h1>
-      <p className="mt-1 text-sm text-ink-500">
-        Tiendas con repartidores propios (terminan en &quot;MF&quot;). Data de operaciones; resumen arriba y detalle abajo.
-      </p>
 
       {/* Filtros */}
       <Card className="mt-6">
@@ -432,9 +429,9 @@ export default function FlotillaPage() {
           accent={(k?.pct_dev ?? 1) <= 0.02 ? "success" : "warning"}
         />
         <KpiCard label="% Cancelación" value={cargando(pct(k?.pct_canc, 2))} sublabel={`${int(k?.canceladas)} canceladas o rechazadas`} accent={(k?.pct_canc ?? 1) <= 0.02 ? "success" : "danger"} />
-        <KpiCard label="Asignación" value={cargando(min(k?.asignacion))} sublabel="Hasta que un repartidor la toma" />
-        <KpiCard label="Espera en tienda" value={cargando(min(k?.espera))} sublabel="Repartidor esperando la orden" accent="warning" />
-        <KpiCard label="Entrega al cliente" value={cargando(min(k?.entrega))} sublabel="De la tienda al cliente" />
+        <KpiCard label="Asignación" value={cargando(min(k?.asignacion))} />
+        <KpiCard label="Espera en tienda" value={cargando(min(k?.espera))} accent="warning" />
+        <KpiCard label="Entrega al cliente" value={cargando(min(k?.entrega))} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
