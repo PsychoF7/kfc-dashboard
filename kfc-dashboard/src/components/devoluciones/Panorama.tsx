@@ -7,7 +7,6 @@ import KpiCard from "@/components/KpiCard";
 import FiltersBar from "@/components/FiltersBar";
 import { DashboardFilters, EMPTY_FILTERS, FilterOptions } from "@/lib/types";
 import {
-  META_DICIEMBRE,
   ClimaDia,
   Incidencia,
   TIPOS_INCIDENCIA,
@@ -105,7 +104,7 @@ function GraficaDiaria({
   const W = 760;
   const H = 240;
   const pad = { l: 44, r: 16, t: 16, b: 30 };
-  const maxY = Math.max(META_DICIEMBRE * 1.5, ...datos.map((d) => Math.max(d.pct_dev ?? 0, d.pct_canc ?? 0))) * 1.1;
+  const maxY = Math.max(0.02, ...datos.map((d) => Math.max(d.pct_dev ?? 0, d.pct_canc ?? 0))) * 1.1;
   const paso = (W - pad.l - pad.r) / (datos.length - 1);
   const x = (i: number) => pad.l + i * paso;
   const y = (v: number) => pad.t + (1 - v / maxY) * (H - pad.t - pad.b);
@@ -180,10 +179,6 @@ function GraficaDiaria({
             </text>
           </g>
         ))}
-        <line x1={pad.l} x2={W - pad.r} y1={y(META_DICIEMBRE)} y2={y(META_DICIEMBRE)} stroke="#1F8A54" strokeWidth="1.5" strokeDasharray="5 4" />
-        <text x={W - pad.r} y={y(META_DICIEMBRE) - 5} textAnchor="end" fontSize="10" fill="#1F8A54">
-          Meta dic. 2%
-        </text>
         <path d={area} fill="url(#gradDev)" />
         <path d={linea("pct_canc")} fill="none" stroke="#7D8FFF" strokeWidth="2" />
         <path d={linea("pct_dev")} fill="none" stroke="#891DFF" strokeWidth="2.5" />
@@ -218,9 +213,6 @@ function GraficaDiaria({
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-peri" /> % Cancelación
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-0 w-4 border-t-2 border-dashed border-success" /> Meta de diciembre
         </span>
         {incidencias.length > 0 && (
           <span className="flex items-center gap-1.5">
@@ -493,18 +485,17 @@ export default function Panorama() {
           label="% Devolución"
           value={cargando(pct(k?.pct_dev))}
           sublabel={comparacion(k?.pct_dev ?? null, k?.ant_pct_dev ?? null, hayAnterior) ?? `${int(k?.devueltas)} devueltas`}
-          accent={(k?.pct_dev ?? 1) <= META_DICIEMBRE ? "success" : "warning"}
+          accent="warning"
         />
         <KpiCard
           label={incluirRechazadas ? "% Cancelación (incl. rechazadas)" : "% Cancelación"}
           value={cargando(pct(k?.pct_canc))}
           sublabel={comparacion(k?.pct_canc ?? null, k?.ant_pct_canc ?? null, hayAnterior) ?? `${int(k?.canceladas_criterio)} órdenes`}
-          accent={(k?.pct_canc ?? 1) <= META_DICIEMBRE ? "success" : "danger"}
+          accent="danger"
         />
         <KpiCard
           label="% Problema total"
           value={cargando(pct(k ? (k.devueltas + k.canceladas_criterio) / (k.total || 1) : null))}
-          sublabel={`Meta de diciembre: 2% en cada una`}
         />
         <KpiCard
           label="Órdenes devueltas"
@@ -518,12 +509,6 @@ export default function Panorama() {
           accent="danger"
         />
         <KpiCard label="Monto devuelto" value={cargando(money(k?.monto_devuelto))} accent="warning" />
-        <KpiCard
-          label="Tiendas arriba de la meta"
-          value={cargando(`${int(k?.tiendas_sobre_meta)} de ${int(k?.tiendas_evaluadas)}`)}
-          sublabel="Tiendas con 50+ órdenes y más de 2% de devolución"
-          accent="danger"
-        />
       </div>
 
       {/* Tendencia por día */}
@@ -560,7 +545,7 @@ export default function Panorama() {
               </h2>
               <p className="mt-1 text-xs text-ink-500">
                 Cada círculo es una tienda. Tamaño = número de {metrica === "dev" ? "devueltas" : "canceladas"};
-                color = qué tan lejos está de la meta.
+                color = porcentaje de la tienda.
               </p>
             </div>
             <div className="inline-flex rounded-lg border border-ink-200 p-0.5">
@@ -589,7 +574,7 @@ export default function Panorama() {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-ink-500">
             <div className="flex flex-wrap items-center gap-3">
               {[
-                [0.02, "≤ 2% (meta)"],
+                [0.02, "≤ 2%"],
                 [0.05, "2–5%"],
                 [0.08, "5–8%"],
                 [0.2, "> 8%"],
