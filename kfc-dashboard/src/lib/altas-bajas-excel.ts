@@ -119,6 +119,17 @@ function leerHoja(filas: unknown[][]): MovimientoImportado[] {
     // Del correo solo se conserva el aviso de la alta; en los cambios no se manda correo.
     if (tipo === "cambio" && comentarios && esCorreoEnviado(comentarios)) comentarios = null;
 
+    // En los cambios, la fecha de solicitud es la que dice el comentario ("…cambio … el 23/10/2026").
+    let fechaSolicitud = aFecha(get(f, c.solicitud));
+    if (tipo === "cambio" && comentarios) {
+      const fechas = [...comentarios.matchAll(/\b([0-3]?\d)\/([01]?\d)\/(20\d\d)\b/g)];
+      const ult = fechas[fechas.length - 1];
+      if (ult) {
+        const d = `${ult[3]}-${ult[2].padStart(2, "0")}-${ult[1].padStart(2, "0")}`;
+        if (!Number.isNaN(Date.parse(d))) fechaSolicitud = d;
+      }
+    }
+
     const estadoTxt = limpio(get(f, c.estado));
     const activaTxt = limpio(get(f, c.activa));
     const internas = [nota, limpio(get(f, c.notas))].filter(Boolean);
@@ -127,7 +138,7 @@ function leerHoja(filas: unknown[][]): MovimientoImportado[] {
       sucursal: nombre,
       producto,
       producto_anterior: anterior,
-      fecha_solicitud: aFecha(get(f, c.solicitud)),
+      fecha_solicitud: fechaSolicitud,
       estado: /^completada$/i.test(estadoTxt) ? "Completada" : "Pendiente",
       activa: /^en operaci/i.test(activaTxt) ? "En operación" : "No iniciada",
       fecha_inicio: aFecha(get(f, c.inicio)),
