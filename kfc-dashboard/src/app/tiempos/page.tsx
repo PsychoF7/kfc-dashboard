@@ -416,7 +416,7 @@ function ZonasRojas({
       )}
 
       {zonas.length === 0 ? (
-        <p className="mt-4 text-xs text-ink-500">Todavía no hay zonas rojas marcadas.</p>
+        <p className="mt-4 text-xs text-ink-500">No hay zonas rojas marcadas.</p>
       ) : (
         <ul className="mt-4 divide-y divide-ink-100">
           {zonas.map((z) => (
@@ -613,12 +613,6 @@ export default function TiemposPage() {
       <div className="mt-6">
         <FiltersBar options={opciones} filters={filtros} onChange={setFiltros} onClear={() => setFiltros(EMPTY_FILTERS)} />
       </div>
-      {data?.periodo && (
-        <p className="mt-2 text-xs text-ink-500">
-          Mostrando del {fechaCorta(data.periodo.desde)} al {fechaCorta(data.periodo.hasta)}
-          {filtros.date_from || filtros.date_to ? "" : " (toda la data)"}.
-        </p>
-      )}
 
       {error && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -768,7 +762,6 @@ export default function TiemposPage() {
       <div className="mt-4 space-y-4">
         <Seccion
           titulo="¿Dónde se pierde el tiempo?"
-          descripcion="Cuánto pesa cada etapa de la orden y qué tiendas se tardan más en asignar y en entregar al repartidor."
           resumen={k ? <span>{minutos(data?.etapas.recol, 0)} hasta que sale · {minutos(data?.etapas.entrega, 0)} de entrega</span> : null}
           abiertaInicial
         >
@@ -812,7 +805,6 @@ export default function TiemposPage() {
 
         <Seccion
           titulo="Ranking de tiendas"
-          descripcion="Lentas = las que más tardan hasta que el repartidor sale con la orden; se comparan contra su misma zona."
           resumen={<span>{conMinimo.length} tiendas</span>}
         >
           <div className="flex flex-wrap items-center gap-3">
@@ -892,7 +884,6 @@ export default function TiemposPage() {
 
         <Seccion
           titulo="Tráfico por zona y hora"
-          descripcion="Velocidad aproximada de los repartidores (distancia entre tiempo de manejo). Más lento = más tráfico."
           resumen={
             horasLentas.length > 0 ? (
               <span>Horas más lentas: {horasLentas.map((h) => hora12(h.hora)).join(", ")}</span>
@@ -959,7 +950,6 @@ export default function TiemposPage() {
 
         <Seccion
           titulo="Zonas rojas"
-          descripcion="Zonas, ciudades o tiendas conflictivas que marcas tú."
           resumen={<span>{zonasRojas.length} marcadas</span>}
         >
           <ZonasRojas zonas={zonasRojas} opciones={opciones} onCambio={() => setRecargar((n) => n + 1)} />
@@ -967,7 +957,6 @@ export default function TiemposPage() {
 
         <Seccion
           titulo="Relación con devoluciones"
-          descripcion="Qué tanto sube la devolución cuando el repartidor tarda más en salir con la orden."
           resumen={
             data?.relacion_devoluciones?.length ? (
               <span>
