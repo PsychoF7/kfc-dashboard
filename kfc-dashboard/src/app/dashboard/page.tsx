@@ -70,9 +70,6 @@ export default function DashboardPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-ink-900">Panel principal</h1>
-          <p className="text-sm text-ink-500">
-            Resumen general de la operación de delivery — solo tiendas KFC.
-          </p>
         </div>
       </div>
 
