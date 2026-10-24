@@ -121,8 +121,9 @@ function leerHoja(filas: unknown[][]): MovimientoImportado[] {
 
     // En los cambios, la fecha de solicitud es la que dice el comentario ("…cambio … el 23/10/2026").
     let fechaSolicitud = aFecha(get(f, c.solicitud));
-    if (tipo === "cambio" && comentarios) {
-      const fechas = [...comentarios.matchAll(/\b([0-3]?\d)\/([01]?\d)\/(20\d\d)\b/g)];
+    const textoFechas = [comentarios, limpio(get(f, c.notas))].filter(Boolean).join(" ");
+    if (tipo === "cambio" && textoFechas) {
+      const fechas = [...textoFechas.matchAll(/\b([0-3]?\d)\/([01]?\d)\/(20\d\d)\b/g)];
       const ult = fechas[fechas.length - 1];
       if (ult) {
         const d = `${ult[3]}-${ult[2].padStart(2, "0")}-${ult[1].padStart(2, "0")}`;
