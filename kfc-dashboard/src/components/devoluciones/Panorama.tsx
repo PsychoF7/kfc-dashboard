@@ -409,11 +409,7 @@ export default function Panorama() {
   );
   const maxMotivo = Math.max(0, ...(data?.motivos ?? []).map((m) => m.ordenes));
   const maxZona = Math.max(0, ...(data?.zonas ?? []).map((z) => z.devueltas + z.canceladas));
-
   const cargando = (v: string) => (loading ? "…" : v);
-  const sinUbicacion = (data?.tiendas ?? []).filter(
-    (t) => t.ordenes >= minOrdenes && (t.lat == null || t.lon == null)
-  ).length;
 
   if (rango && !rango.fecha_max) {
     return (
@@ -465,13 +461,11 @@ export default function Panorama() {
         </div>
       </div>
       <p className="mt-2 text-xs text-ink-500">
-        Data de operaciones, mismo criterio que el panel principal
         {data?.periodo
-          ? ` · mostrando del ${fechaCorta(data.periodo.desde)} al ${fechaCorta(data.periodo.hasta)}${
+          ? `Mostrando del ${fechaCorta(data.periodo.desde)} al ${fechaCorta(data.periodo.hasta)}${
               filtros.date_from || filtros.date_to ? "" : " (toda la data)"
             }`
           : ""}
-        .
       </p>
 
       {error && (
@@ -514,7 +508,6 @@ export default function Panorama() {
       {/* Tendencia por día */}
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
         <h2 className="text-sm font-semibold text-ink-900">Tendencia por día</h2>
-        <p className="mt-1 text-xs text-ink-500">Pasa el mouse sobre un día para ver su detalle y compararlo con la semana anterior; da clic para dejarlo fijo.</p>
         <div className="mt-3">
           {data ? (
             <GraficaDiaria datos={data.por_dia} incidencias={incidencias} clima={climaVisible} />
@@ -543,10 +536,6 @@ export default function Panorama() {
               <h2 className="text-sm font-semibold text-ink-900">
                 ¿Dónde se concentran las {metrica === "dev" ? "devoluciones" : "cancelaciones"}?
               </h2>
-              <p className="mt-1 text-xs text-ink-500">
-                Cada círculo es una tienda. Tamaño = número de {metrica === "dev" ? "devueltas" : "canceladas"};
-                color = porcentaje de la tienda.
-              </p>
             </div>
             <div className="inline-flex rounded-lg border border-ink-200 p-0.5">
               {(
@@ -600,19 +589,12 @@ export default function Panorama() {
               </select>
             </label>
           </div>
-          {sinUbicacion > 0 && (
-            <p className="mt-2 text-xs text-ink-500">
-              {sinUbicacion} {sinUbicacion === 1 ? "tienda no aparece" : "tiendas no aparecen"} en el mapa
-              porque todavía no tienen data de tiempos cargada (de ahí se toma su ubicación).
-            </p>
-          )}
         </div>
 
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <h2 className="text-sm font-semibold text-ink-900">
             Tiendas con mayor % de {metrica === "dev" ? "devolución" : "cancelación"}
           </h2>
-          <p className="mt-1 text-xs text-ink-500">Con {minOrdenes}+ órdenes en el periodo.</p>
           <ol className="mt-4 space-y-3">
             {topTiendas.map((t, i) => (
               <li key={t.tienda}>
@@ -693,7 +675,6 @@ export default function Panorama() {
 
         <div className="rounded-xl border border-ink-100 bg-white p-5 shadow-card">
           <h2 className="text-sm font-semibold text-ink-900">Por zona</h2>
-          <p className="mt-1 text-xs text-ink-500">Barra = devueltas + canceladas.</p>
           <ul className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
             {(data?.zonas ?? []).map((z) => (
               <li key={z.zona}>
