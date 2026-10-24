@@ -299,7 +299,6 @@ function GraficaHora({ datos }: { datos: Flotilla["por_hora"] }) {
           <p className="text-ink-500">{int(sel.ordenes)} órdenes</p>
         </div>
       )}
-      <p className="mt-2 text-xs text-ink-500">Hora en que se creó la orden (0 a 23 h). Línea roja = 45 min.</p>
     </div>
   );
 }
@@ -354,7 +353,7 @@ export default function FlotillaPage() {
       <div className="mx-auto max-w-7xl px-6 py-8">
         <h1 className="text-xl font-semibold text-ink-900">Mi Flotilla</h1>
         <Card className="mt-6">
-          <p className="text-sm text-ink-700">Todavía no hay órdenes de tiendas Mi Flotilla (MF) en la data de operaciones.</p>
+          <p className="text-sm text-ink-700">Sin órdenes por ahora.</p>
         </Card>
       </div>
     );
@@ -437,19 +436,16 @@ export default function FlotillaPage() {
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <h2 className="text-sm font-semibold text-ink-900">Tendencia por día</h2>
-          <p className="mt-1 text-xs text-ink-500">Pasa el mouse para ver el detalle de cada día.</p>
           <div className="mt-3">{data?.por_dia ? <GraficaDia datos={data.por_dia} /> : <div className="h-56 animate-pulse rounded-lg bg-ink-50" />}</div>
         </Card>
         <Card>
           <h2 className="text-sm font-semibold text-ink-900">Tendencia por hora</h2>
-          <p className="mt-1 text-xs text-ink-500">Para ubicar los horarios con más tiempo.</p>
           <div className="mt-3">{data?.por_hora ? <GraficaHora datos={data.por_hora} /> : <div className="h-56 animate-pulse rounded-lg bg-ink-50" />}</div>
         </Card>
       </div>
 
       {/* ====================== DETALLE ====================== */}
       <h2 className="mt-12 text-lg font-semibold text-ink-900">Detalle</h2>
-      <p className="mt-1 text-sm text-ink-500">Abre cada sección para ver el análisis completo.</p>
 
       <div className="mt-4 space-y-4">
         <Seccion
