@@ -603,7 +603,7 @@ export default function TiemposPage() {
         <div>
           <h1 className="text-xl font-semibold text-ink-900">Análisis de tiempos</h1>
           <p className="mt-1 text-sm text-ink-500">
-            Resumen visual arriba y el detalle abajo. Data de operaciones, solo órdenes completadas de KFC.
+            Solo órdenes completadas.
           </p>
         </div>
         {!soloConsulta && (
@@ -662,24 +662,21 @@ export default function TiemposPage() {
         <KpiCard
           label="Hasta que sale el repartidor"
           value={cargando(minutos(k?.recol_prom))}
-          sublabel={`Mediana ${minutos(k?.recol_med)} · de la creación a la recolección`}
+          sublabel={`Mediana ${minutos(k?.recol_med)}`}
           accent="warning"
         />
-        <KpiCard label="Entrega al cliente" value={cargando(minutos(k?.entrega_prom))} sublabel="De la tienda al cliente" />
+        <KpiCard label="Entrega al cliente" value={cargando(minutos(k?.entrega_prom))} />
         <KpiCard
           label="Espera exacta en tienda"
           value={cargando(minutos(k?.espera_prom))}
-          sublabel={`Solo Rappi y flotilla (${int(k?.n_espera)} órdenes)`}
         />
         <KpiCard
           label="Velocidad aprox. del repartidor"
           value={cargando(k?.kmh_med == null ? "—" : `${k.kmh_med.toFixed(1)} km/h`)}
-          sublabel="Más lento = más tráfico"
         />
         <KpiCard
           label="Tiendas lentas (+5 min vs su zona)"
           value={cargando(`${conMinimo.filter((t) => (t.vs_zona ?? 0) >= 5).length} de ${conMinimo.length}`)}
-          sublabel={`Tiendas con ${minOrdenes}+ órdenes`}
           accent="danger"
         />
       </div>
