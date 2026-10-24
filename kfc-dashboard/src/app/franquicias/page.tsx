@@ -390,12 +390,6 @@ export default function FranquiciasPage() {
           <MultiSelectFilter label="Tienda FQ" items={data?.tiendas_fq ?? []} selected={tiendas} onChange={setTiendas} />
         </div>
       </Card>
-      {data?.periodo && (
-        <p className="mt-2 text-xs text-ink-500">
-          Mostrando del {fechaCorta(data.periodo.desde)} al {fechaCorta(data.periodo.hasta)}
-          {desde || hasta ? "" : " (toda la data)"}.
-        </p>
-      )}
 
       {error && <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
@@ -450,7 +444,6 @@ export default function FranquiciasPage() {
       <div className="mt-4 space-y-4">
         <Seccion
           titulo="¿Dónde se pierde el tiempo?"
-          descripcion="Cada orden trae las 4 etapas por separado. Así ves en qué etapa se va el tiempo, en general y por tienda."
           resumen={k ? <span>Espera en tienda: {min(k.espera)}</span> : null}
           abierta
         >
@@ -485,7 +478,7 @@ export default function FranquiciasPage() {
           </div>
         </Seccion>
 
-        <Seccion titulo="Tiendas FQ" descripcion="Órdenes, tiempos y devoluciones de cada tienda en el periodo." resumen={<span>{lista.length} tiendas</span>}>
+        <Seccion titulo="Tiendas FQ" resumen={<span>{lista.length} tiendas</span>}>
           <div className="inline-flex rounded-lg border border-ink-200 p-0.5">
             {(
               [
