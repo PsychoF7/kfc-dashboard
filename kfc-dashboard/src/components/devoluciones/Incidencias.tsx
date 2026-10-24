@@ -273,7 +273,7 @@ export default function Incidencias({
 
       {!borrador && error && <p className="mt-3 text-xs font-medium text-danger">{error}</p>}
 
-      <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-500">Registradas por ti</h3>
+      <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink-500">Registradas</h3>
       {incidencias.length === 0 ? (
         <p className="mt-2 text-xs text-ink-500">No hay incidencias registradas en este periodo.</p>
       ) : (
