@@ -153,10 +153,6 @@ export default function Incidencias({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-ink-900">Incidencias y contexto</h2>
-          <p className="mt-1 text-xs text-ink-500">
-            Lo que explica por qué subieron las devoluciones o cancelaciones: mal clima, tráfico,
-            intermitencias, bugs… Se marcan en la gráfica y salen en el resumen y el Excel de la semana.
-          </p>
         </div>
         {!borrador && !lectura && (
           <button
@@ -365,14 +361,6 @@ export default function Incidencias({
         </button>
         {climaAbierto && (
         <>
-        <p className="mt-2 text-xs text-ink-500">
-          Se revisa solo el clima de cada ciudad por día. Cuenta como mal clima: lluvia de{" "}
-          {UMBRALES_CLIMA.lluvia_mm} mm o más, tormenta eléctrica con {UMBRALES_CLIMA.tormenta_lluvia_mm} mm o más,
-          o ráfagas de {UMBRALES_CLIMA.rafaga_kmh} km/h o más. Solo se muestra cuando la ciudad pesa en la
-          operación ese día: al menos {RELEVANCIA_CLIMA.min_ordenes} órdenes y al menos{" "}
-          {RELEVANCIA_CLIMA.min_pct_dia * 100}% de las órdenes KFC del día. La nota es opcional; si no afectó,
-          márcalo y ya no sale en el resumen ni en el Excel.
-        </p>
         {diasClima.length === 0 ? (
           <p className="mt-3 text-xs text-ink-500">No se detectó mal clima en este periodo.</p>
         ) : (
