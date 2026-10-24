@@ -460,13 +460,6 @@ export default function Panorama() {
           </button>
         </div>
       </div>
-      <p className="mt-2 text-xs text-ink-500">
-        {data?.periodo
-          ? `Mostrando del ${fechaCorta(data.periodo.desde)} al ${fechaCorta(data.periodo.hasta)}${
-              filtros.date_from || filtros.date_to ? "" : " (toda la data)"
-            }`
-          : ""}
-      </p>
 
       {error && (
         <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
