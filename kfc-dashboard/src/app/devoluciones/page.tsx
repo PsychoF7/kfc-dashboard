@@ -6,7 +6,6 @@ import clsx from "clsx";
 import { getWeekRange } from "@/lib/week";
 import Panorama from "@/components/devoluciones/Panorama";
 import {
-  META_DICIEMBRE,
   DevGrupo,
   DevReporte,
   ClimaDia,
@@ -377,10 +376,6 @@ function DevolucionesCompleta() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <h1 className="text-xl font-semibold text-ink-900">Devoluciones y cancelaciones</h1>
-      <p className="mt-1 text-sm text-ink-500">
-        Panorama general de devueltas y canceladas, y abajo el reporte semanal que compartes con
-        KFC. Meta de diciembre: 2%.
-      </p>
 
       <Panorama />
 
@@ -897,7 +892,6 @@ export default function DevolucionesPage() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-8">
       <h1 className="text-xl font-semibold text-ink-900">Devoluciones y cancelaciones</h1>
-      <p className="mt-1 text-sm text-ink-500">Panorama general de devueltas y canceladas. Meta de diciembre: 2%.</p>
       <Panorama />
     </div>
   );
