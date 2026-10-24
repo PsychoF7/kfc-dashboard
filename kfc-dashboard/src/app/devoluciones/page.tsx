@@ -382,11 +382,6 @@ function DevolucionesCompleta() {
       {/* Reporte semanal */}
       <div className="mt-12 border-t border-ink-100 pt-8">
         <h2 className="text-lg font-semibold text-ink-900">Reporte semanal para KFC</h2>
-        <p className="mt-1 text-sm text-ink-500">
-          Se calcula solo con la data de tiempos (la que trae teléfonos, coordenadas y direcciones):
-          duplicados, casos, calidad de dirección y ranking de una semana, con el Excel listo para
-          compartir.
-        </p>
       </div>
 
       <Card className="mt-4">
@@ -478,7 +473,6 @@ function DevolucionesCompleta() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-[11px] text-ink-500">También sale en la hoja Resumen del Excel.</p>
                 </div>
               )}
             </Card>
@@ -620,10 +614,6 @@ function DevolucionesCompleta() {
 
             {tab === "duplicados" && (
               <div>
-                <p className="text-xs text-ink-500">
-                  Casos nuevos de esta semana con 3+ órdenes y 50%+ de devolución. Haz clic en una
-                  fila para ver teléfonos, direcciones y el ID de cada orden.
-                </p>
                 <div className="mt-3 inline-flex rounded-lg border border-ink-200 p-0.5">
                   {(
                     [
@@ -663,9 +653,6 @@ function DevolucionesCompleta() {
 
             {tab === "casos" && (
               <div>
-                <p className="text-xs text-ink-500">
-                  Devoluciones con dato de espera en tienda, de mayor a menor espera.
-                </p>
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -753,7 +740,6 @@ function DevolucionesCompleta() {
                 </section>
                 <section>
                   <h3 className="text-sm font-semibold text-ink-900">Tiendas donde más espera el repartidor</h3>
-                  <p className="mt-1 text-xs text-ink-500">Mínimo 10 órdenes con dato.</p>
                   <div className="mt-3 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -793,10 +779,6 @@ function DevolucionesCompleta() {
 
             {tab === "calidad" && (
               <div>
-                <p className="text-xs text-ink-500">
-                  Tiendas con 50+ órdenes, ordenadas por % de direcciones con algún problema (CP
-                  faltante o incompleto, calle sin número o colonia vacía).
-                </p>
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -845,9 +827,6 @@ function DevolucionesCompleta() {
                 ).map(([titulo, filas, color]) => (
                   <section key={titulo}>
                     <h3 className="text-sm font-semibold text-ink-900">{titulo}</h3>
-                    <p className="mt-1 text-xs text-ink-500">
-                      % problema = devoluciones + cancelaciones. Mínimo 50 órdenes, sin tiendas MF.
-                    </p>
                     <div className="mt-3 overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
