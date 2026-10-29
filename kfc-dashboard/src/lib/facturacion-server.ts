@@ -9,13 +9,25 @@ import {
   calcularFactura,
   mesAnterior,
   mesSiguiente,
+  tipoDe,
   ultimoDia,
 } from "@/lib/facturacion";
 
+const esFranquicia = (nombre: string) => tipoDe(nombre) === "franquicia";
+
 async function ordenesDelMes(mesOperado: string): Promise<OrdenesDia[]> {
+  const [normales, franq] = await Promise.all([
+    ordenesRpc("get_fact_ordenes_mes", mesOperado),
+    // Franquicias cuentan todos los estatus (no solo completadas y devueltas)
+    ordenesRpc("get_fact_ordenes_mes_franq", mesOperado),
+  ]);
+  return [...normales.filter((o) => !esFranquicia(o.restaurant)), ...franq.filter((o) => esFranquicia(o.restaurant))];
+}
+
+async function ordenesRpc(funcion: string, mesOperado: string): Promise<OrdenesDia[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await withRetryResult(() =>
-    supabase.rpc("get_fact_ordenes_mes", { p_desde: mesOperado, p_hasta: ultimoDia(mesOperado) })
+    supabase.rpc(funcion, { p_desde: mesOperado, p_hasta: ultimoDia(mesOperado) })
   );
   if (error) throw new Error(error.message);
   const lista: OrdenesDia[] = [];
