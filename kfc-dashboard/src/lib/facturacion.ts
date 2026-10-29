@@ -13,8 +13,19 @@
 //   mes operado. Días a cobrar = de su primera orden al fin de mes.
 // · Cobro = tiendas × costo mensual + proporcional (días × costo ÷ días del
 //   mes operado), Delivery y Mi Flotilla por separado; + IVA.
+// · Franquicias (tiendas que terminan en "FQ"): $800 de base + $3 por cada
+//   orden del mes operado (todos los estatus), con tope de $1,500 por tienda.
+//   No llevan proporcional.
 
-export type TipoTienda = "delivery" | "flotilla";
+export type TipoTienda = "delivery" | "flotilla" | "franquicia";
+
+/** Cobro de Franquicias: base + por orden, con tope mensual por tienda. */
+export const FRANQUICIA = { base: 800, porOrden: 3, tope: 1500 };
+
+export function cobroFranquicia(ordenes: number) {
+  const suma = FRANQUICIA.base + FRANQUICIA.porOrden * ordenes;
+  return { suma, monto: Math.min(suma, FRANQUICIA.tope), tope: suma > FRANQUICIA.tope };
+}
 export type EstadoTienda = "continua" | "nueva" | "sin_ordenes" | "alta_manual" | "baja";
 
 export interface OrdenesDia {
@@ -52,6 +63,13 @@ export interface FilaFactura {
 
 export interface ResumenFactura {
   tiendasFacturar: number;
+  /** Tiendas con cobro fijo mensual (Delivery y Mi Flotilla) */
+  tiendasCobroFijo: number;
+  tiendasFranquicia: number;
+  nuevasFranquicia: number;
+  ordenesFranquicia: number;
+  franquiciasConTope: number;
+  montoFranquicia: number;
   continuas: number;
   sinOrdenes: number;
   altasManuales: number;
@@ -85,7 +103,8 @@ const MESES = [
 ];
 
 export const codigoDe = (nombre: string) => nombre.trim().match(/^\d+/)?.[0] ?? nombre.trim().toUpperCase();
-export const tipoDe = (nombre: string): TipoTienda => (/\sMF$/i.test(nombre.trim()) ? "flotilla" : "delivery");
+export const tipoDe = (nombre: string): TipoTienda =>
+  /\sFQ$/i.test(nombre.trim()) ? "franquicia" : /\sMF$/i.test(nombre.trim()) ? "flotilla" : "delivery";
 
 export function partesMes(iso: string) {
   const [y, m] = iso.slice(0, 7).split("-").map(Number);
@@ -168,7 +187,9 @@ export function calcularFactura(p: {
     else if (total > 0) estado = "nueva";
     else estado = "alta_manual";
 
-    const diasCobrar = estado === "nueva" && primerDia ? diasMes - primerDia + 1 : null;
+    const esFranq = tipo === "franquicia";
+    // Franquicias: sin proporcional (no hay días a cobrar); se cobra por órdenes del mes.
+    const diasCobrar = !esFranq && estado === "nueva" && primerDia ? diasMes - primerDia + 1 : null;
     filas.push({
       tienda: nombre,
       codigo,
@@ -178,7 +199,13 @@ export function calcularFactura(p: {
       total,
       primerDia,
       diasCobrar,
-      monto: diasCobrar != null ? redondear(diasCobrar * costoDiario) : null,
+      monto: esFranq
+        ? estado === "baja"
+          ? null
+          : cobroFranquicia(total).monto
+        : diasCobrar != null
+          ? redondear(diasCobrar * costoDiario)
+          : null,
       nota: aj?.nota ?? null,
     });
     vistos.add(codigo);
@@ -196,10 +223,13 @@ export function calcularFactura(p: {
   const nuevasF = filas.filter((f) => f.estado === "nueva" && f.tipo === "flotilla");
   const diasDelivery = nuevasD.reduce((s, f) => s + (f.diasCobrar ?? 0), 0);
   const diasFlotilla = nuevasF.reduce((s, f) => s + (f.diasCobrar ?? 0), 0);
-  const montoBase = facturables.length * p.costoMensual;
+  const franq = facturables.filter((f) => f.tipo === "franquicia");
+  const fijas = facturables.filter((f) => f.tipo !== "franquicia");
+  const montoFranquicia = franq.reduce((s, f) => s + (f.monto ?? 0), 0);
+  const montoBase = fijas.length * p.costoMensual;
   const proporcionalDelivery = diasDelivery * costoDiario;
   const proporcionalFlotilla = diasFlotilla * costoDiario;
-  const subtotal = montoBase + proporcionalDelivery + proporcionalFlotilla;
+  const subtotal = montoBase + proporcionalDelivery + proporcionalFlotilla + montoFranquicia;
   const iva = subtotal * p.iva;
 
   return {
@@ -209,6 +239,12 @@ export function calcularFactura(p: {
     filas,
     resumen: {
       tiendasFacturar: facturables.length,
+      tiendasCobroFijo: fijas.length,
+      tiendasFranquicia: franq.length,
+      nuevasFranquicia: filas.filter((f) => f.estado === "nueva" && f.tipo === "franquicia").length,
+      ordenesFranquicia: franq.reduce((s, f) => s + f.total, 0),
+      franquiciasConTope: franq.filter((f) => cobroFranquicia(f.total).tope).length,
+      montoFranquicia: redondear(montoFranquicia),
       continuas: filas.filter((f) => f.estado === "continua").length,
       sinOrdenes: filas.filter((f) => f.estado === "sin_ordenes").length,
       altasManuales: filas.filter((f) => f.estado === "alta_manual").length,
@@ -236,4 +272,10 @@ export const ESTADOS: Record<EstadoTienda, { label: string; clase: string }> = {
   sin_ordenes: { label: "Sin órdenes", clase: "bg-warning-bg text-warning" },
   alta_manual: { label: "Alta sin órdenes", clase: "bg-brand-50 text-brand-700" },
   baja: { label: "Baja", clase: "bg-danger-bg text-danger" },
+};
+
+export const NOMBRE_TIPO: Record<TipoTienda, string> = {
+  delivery: "Delivery",
+  flotilla: "Mi Flotilla",
+  franquicia: "Franquicia",
 };
