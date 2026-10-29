@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
-import { ESTADOS, FilaFactura, mesAnterior, mesSiguiente, nombreMes, nombreMesAnio, partesMes } from "@/lib/facturacion";
+import { ESTADOS, FilaFactura, NOMBRE_TIPO, mesAnterior, mesSiguiente, nombreMes, nombreMesAnio, partesMes } from "@/lib/facturacion";
 import type { FacturaRespuesta } from "@/lib/facturacion-server";
 
 const money = (n: number | null | undefined, d = 2) =>
@@ -338,8 +338,8 @@ export default function FacturacionPage() {
             <KpiCard label="Tiendas a facturar" value={int(r.tiendasFacturar)} sublabel={`${int(r.continuas)} con órdenes`} />
             <KpiCard
               label="Nuevas"
-              value={int(r.nuevasDelivery + r.nuevasFlotilla)}
-              sublabel={`${r.nuevasDelivery} Delivery · ${r.nuevasFlotilla} Mi Flotilla`}
+              value={int(r.nuevasDelivery + r.nuevasFlotilla + r.nuevasFranquicia)}
+              sublabel={`${r.nuevasDelivery} Delivery · ${r.nuevasFlotilla} Mi Flotilla${r.nuevasFranquicia ? ` · ${r.nuevasFranquicia} Franquicias` : ""}`}
               accent="success"
             />
             <KpiCard label="Sin órdenes" value={int(r.sinOrdenes + r.altasManuales)} sublabel="Se cobran completas" accent="warning" />
@@ -350,7 +350,7 @@ export default function FacturacionPage() {
               sublabel={
                 cambioOrdenes != null
                   ? `${cambioOrdenes >= 0 ? "▲" : "▼"} ${Math.abs(cambioOrdenes).toFixed(1)}% vs mes anterior`
-                  : "Completadas + devueltas"
+                  : undefined
               }
             />
             <KpiCard label="Total con IVA" value={money(r.total, 0)} accent="danger" />
@@ -375,7 +375,7 @@ export default function FacturacionPage() {
                     <td className="py-2 pr-4 text-ink-900">
                       Mes de {nombreMes(c.mesPago).toLowerCase()} ({money(r.costoMensual, 0)} por tienda)
                     </td>
-                    <td className="py-2 pr-4 text-right tabular-nums">{int(r.tiendasFacturar)}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{int(r.tiendasCobroFijo)}</td>
                     <td className="py-2 pr-4 text-right tabular-nums">{c.diasMes}</td>
                     <td className="py-2 pr-4 text-right tabular-nums">{money(r.costoDiario)}</td>
                     <td className="py-2 text-right font-medium tabular-nums">{money(r.montoBase)}</td>
@@ -394,6 +394,15 @@ export default function FacturacionPage() {
                     <td className="py-2 pr-4 text-right tabular-nums">{money(r.costoDiario)}</td>
                     <td className="py-2 text-right font-medium tabular-nums">{money(r.proporcionalFlotilla)}</td>
                   </tr>
+                  {r.tiendasFranquicia > 0 && (
+                    <tr className="border-b border-ink-100">
+                      <td className="py-2 pr-4 text-ink-900">Franquicias · costo variable</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{int(r.tiendasFranquicia)}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">—</td>
+                      <td className="py-2 pr-4 text-right tabular-nums">—</td>
+                      <td className="py-2 text-right font-medium tabular-nums">{money(r.montoFranquicia)}</td>
+                    </tr>
+                  )}
                   <tr>
                     <td colSpan={4} className="pt-3 pr-4 text-right text-ink-700">Subtotal</td>
                     <td className="pt-3 text-right font-semibold tabular-nums">{money(r.subtotal)}</td>
@@ -439,11 +448,11 @@ export default function FacturacionPage() {
                       {nuevas.map((f) => (
                         <tr key={f.codigo} className="border-b border-ink-100 last:border-0">
                           <td className="py-2 pr-4 text-ink-900">{f.tienda}</td>
-                          <td className="py-2 pr-4 text-xs text-ink-500">{f.tipo === "flotilla" ? "Mi Flotilla" : "Delivery"}</td>
+                          <td className="py-2 pr-4 text-xs text-ink-500">{NOMBRE_TIPO[f.tipo]}</td>
                           <td className="py-2 pr-4 text-right tabular-nums">
                             {f.primerDia} de {nombreMes(c.mesOperado).toLowerCase()}
                           </td>
-                          <td className="py-2 pr-4 text-right font-semibold tabular-nums">{f.diasCobrar}</td>
+                          <td className="py-2 pr-4 text-right font-semibold tabular-nums">{f.diasCobrar ?? "—"}</td>
                           <td className="py-2 pr-4 text-right tabular-nums">{money(f.monto)}</td>
                           <td className="py-2 pr-4 text-right tabular-nums">{int(f.total)}</td>
                           <td className="py-2">
@@ -574,7 +583,7 @@ export default function FacturacionPage() {
                       <th className="py-2 pr-4 font-medium">Estado</th>
                       <th className="py-2 pr-4 text-right font-medium">Órdenes</th>
                       <th className="py-2 pr-4 text-right font-medium">Primera orden</th>
-                      <th className="py-2 text-right font-medium">Proporcional</th>
+                      <th className="py-2 text-right font-medium">Monto</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -582,7 +591,7 @@ export default function FacturacionPage() {
                       <tr key={f.codigo} className="border-b border-ink-100 last:border-0">
                         <td className="py-1.5 pr-4 text-xs text-ink-300">{i + 1}</td>
                         <td className="py-1.5 pr-4 text-ink-900">{f.tienda}</td>
-                        <td className="py-1.5 pr-4 text-xs text-ink-500">{f.tipo === "flotilla" ? "Mi Flotilla" : "Delivery"}</td>
+                        <td className="py-1.5 pr-4 text-xs text-ink-500">{NOMBRE_TIPO[f.tipo]}</td>
                         <td className="py-1.5 pr-4">
                           <span className={clsx("rounded px-1.5 py-0.5 text-[10px] font-semibold", ESTADOS[f.estado].clase)}>
                             {ESTADOS[f.estado].label}
