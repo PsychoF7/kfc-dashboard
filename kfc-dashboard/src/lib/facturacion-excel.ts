@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { CalculoFactura, FRANQUICIA, FilaFactura, cobroFranquicia, nombreMes, partesMes } from "./facturacion";
+import { CalculoFactura, FilaFactura, nombreMes, partesMes } from "./facturacion";
 
 // Mismo formato que tus facturas: Calibri 11, encabezados azul marino,
 // bloque de cobro verde/amarillo y TOTAL en rojo.
@@ -120,8 +120,7 @@ function hojaPrincipal(wb: ExcelJS.Workbook, c: CalculoFactura) {
     [`AL INICIO DE ${mesPago.toUpperCase()} ${partesMes(c.mesPago).y}`, "-", R.tiendasCobroFijo, 0, R.tiendasCobroFijo, N, f(costoDia), null, null],
     [`PROPORCIONAL DE ${mesOp} DELIVERY`, null, R.nuevasDelivery, R.nuevasDelivery, null, R.diasDelivery, f(costoDia), R.costoMensual, null],
     [`PROPORCIONAL DE ${mesOp} MI FLOTILLA`, null, R.nuevasFlotilla, R.nuevasFlotilla, null, R.diasFlotilla, f(costoDia), R.costoMensual, null],
-    [`FRANQUICIAS AL INICIO DE ${mesPago.toUpperCase()} ${partesMes(c.mesPago).y}`, null, R.tiendasFranquicia, R.nuevasFranquicia, null, null, "Costo variable*", null, R.montoFranquicia],
-    ["Total a Facturar ", null, R.tiendasCobroFijo + R.tiendasFranquicia, null, R.tiendasCobroFijo, N, f(costoDia), null, null],
+    ["Total a Facturar ", null, R.tiendasCobroFijo, null, R.tiendasCobroFijo, N, f(costoDia), null, null],
     [null, null, null, null, null, null, f(costoDia), null, null],
   ];
   filasCobro.forEach((vals, i) => {
@@ -138,12 +137,12 @@ function hojaPrincipal(wb: ExcelJS.Workbook, c: CalculoFactura) {
     ws.getCell(r, 9).numFmt = MONEDA_1; // Fact proporcional
     ws.getCell(r, 10).numFmt = MONEDA;
     // Fact proporcional = costo x día × días (filas 1, 4, 5 y 6, como en tu archivo)
-    if (i === 0 || i === 4 || i === 5) ws.getCell(r, 9).value = f(`H${r}*G${r}`, i < 5 ? R.costoMensual : 0);
+    if (i === 0 || i === 3 || i === 4) ws.getCell(r, 9).value = f(`H${r}*G${r}`, i < 4 ? R.costoMensual : 0);
   });
   const rInicio = r0 + 1;
   ws.getCell(rInicio + 1, 10).value = f(`G${rInicio + 1}*H${rInicio + 1}`, R.proporcionalDelivery);
   ws.getCell(rInicio + 2, 10).value = f(`G${rInicio + 2}*H${rInicio + 2}`, R.proporcionalFlotilla);
-  ws.getCell(rInicio + 4, 10).value = f(`I${rInicio + 4}*F${rInicio + 4}`, R.montoBase);
+  ws.getCell(rInicio + 3, 10).value = f(`I${rInicio + 3}*F${rInicio + 3}`, R.montoBase);
 
   const rSuma = rInicio + filasCobro.length;
   const suma = ws.getCell(rSuma, 10);
@@ -176,9 +175,6 @@ function hojaPrincipal(wb: ExcelJS.Workbook, c: CalculoFactura) {
       if (rojo) cel.fill = fill(ROJO);
     }
   });
-  const nota = ws.getCell(rSuma + 6, 2);
-  nota.value = `* Costo variable: cada franquicia paga $${FRANQUICIA.base} de base más $${FRANQUICIA.porOrden} por cada orden operada en el mes, con tope de $${FRANQUICIA.tope.toLocaleString("en-US")} por tienda. El detalle está en la hoja "Franquicias ${mesPago}".`;
-  nota.font = fuente({ italic: true, color: { argb: NEGRO } });
 }
 
 // ---------------------------------------------------------------------
@@ -313,87 +309,6 @@ function hojaProporcional(wb: ExcelJS.Workbook, c: CalculoFactura) {
   bloqueProporcional(ws, fin + 3, "MI FLOTILLA", nuevas.filter((x) => x.tipo === "flotilla").sort(porDia), c);
 }
 
-// ---------------------------------------------------------------------
-// Hoja 4: Franquicias (explicación + cobro por tienda, sin proporcionales)
-// ---------------------------------------------------------------------
-function hojaFranquicias(wb: ExcelJS.Workbook, c: CalculoFactura) {
-  const ws = wb.addWorksheet(`Franquicias ${nombreMes(c.mesPago)}`);
-  [40, 28, 44, 16, 16, 16, 16, 16].forEach((w, i) => (ws.getColumn(1 + i).width = w));
-
-  ws.getCell(1, 1).value = "Cómo se factura Franquicias";
-  ws.getCell(1, 1).font = fuente({ bold: true, size: 14 });
-
-  const comparacion = [
-    ["Concepto", "Delivery y Mi Flotilla", "Franquicias"],
-    ["Cobro", `$${c.resumen.costoMensual.toLocaleString("en-US")} por tienda al mes`, `$${FRANQUICIA.base} de base + $${FRANQUICIA.porOrden} por cada orden operada`],
-    ["Tope por tienda", "No aplica", `$${FRANQUICIA.tope.toLocaleString("en-US")} al mes`],
-    ["Estatus que se cuentan", "Completadas y devueltas", "Todos los estatus"],
-    ["Proporcional del mes de activación", "Sí, por los días operados", "No se cobra proporcional"],
-  ];
-  comparacion.forEach((fila, i) => {
-    fila.forEach((v, k) => {
-      const cel = ws.getCell(3 + i, 1 + k);
-      cel.value = v;
-      cel.border = BORDE;
-      cel.alignment = { vertical: "middle", wrapText: true };
-      if (i === 0) {
-        cel.font = fuente({ bold: true });
-        cel.fill = fill(AZUL_CLARO);
-      } else cel.font = fuente();
-    });
-  });
-
-  const r0 = 10;
-  ws.getCell(r0, 1).value = `Cobro por tienda: órdenes de ${nombreMes(c.mesOperado).toLowerCase()}`;
-  ws.getCell(r0, 1).font = fuente({ bold: true, size: 12 });
-  const heads = ["Tienda", "Órdenes (trx)", "Base SaaS", "Transacciones", "Suma base + trx", "Tope aplicable", "A facturar", "¿Aplicó el tope?"];
-  heads.forEach((t, i) => {
-    const cel = ws.getCell(r0 + 1, 1 + i);
-    cel.value = t;
-    cel.font = fuente({ bold: true });
-    cel.fill = fill(AZUL_CLARO);
-    cel.border = BORDE;
-    cel.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-  });
-  const tiendas = c.filas.filter((x) => x.tipo === "franquicia" && x.estado !== "baja").sort((a, b) => a.tienda.localeCompare(b.tienda));
-  let r = r0 + 2;
-  const primera = r;
-  for (const t of tiendas) {
-    const cob = cobroFranquicia(t.total);
-    ws.getCell(r, 1).value = t.tienda;
-    ws.getCell(r, 2).value = t.total;
-    ws.getCell(r, 3).value = FRANQUICIA.base;
-    ws.getCell(r, 4).value = f(`${FRANQUICIA.porOrden}*B${r}`, FRANQUICIA.porOrden * t.total);
-    ws.getCell(r, 5).value = f(`C${r}+D${r}`, cob.suma);
-    ws.getCell(r, 6).value = FRANQUICIA.tope;
-    ws.getCell(r, 7).value = f(`MIN(E${r},F${r})`, cob.monto);
-    ws.getCell(r, 8).value = { formula: `IF(E${r}>F${r},"SI","NO")`, result: cob.tope ? "SI" : "NO" };
-    for (let k = 1; k <= 8; k++) {
-      const cel = ws.getCell(r, k);
-      cel.border = BORDE;
-      cel.font = fuente();
-      if (k >= 3 && k <= 7) cel.numFmt = '"$"#,##0.00';
-      if (k === 2) cel.numFmt = "#,##0";
-      if (k === 8) cel.alignment = { horizontal: "center" };
-    }
-    r++;
-  }
-  ws.getCell(r, 1).value = "Total";
-  if (tiendas.length) {
-    for (const k of [2, 3, 4, 5, 7]) {
-      const L = col(k);
-      ws.getCell(r, k).value = f(`SUM(${L}${primera}:${L}${r - 1})`);
-      ws.getCell(r, k).numFmt = k === 2 ? "#,##0" : '"$"#,##0.00';
-    }
-  }
-  for (let k = 1; k <= 8; k++) {
-    const cel = ws.getCell(r, k);
-    cel.fill = fill(AZUL);
-    cel.font = fuente({ bold: true, color: { argb: BLANCO } });
-    cel.border = BORDE;
-  }
-}
-
 /** Excel de la factura con tus 3 hojas: {Mes}, Nuevas {Mes} y Proporcional {Mes}. */
 export async function construirExcelFactura(c: CalculoFactura): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
@@ -401,7 +316,6 @@ export async function construirExcelFactura(c: CalculoFactura): Promise<Buffer> 
   hojaPrincipal(wb, c);
   hojaNuevas(wb, c);
   hojaProporcional(wb, c);
-  if (c.resumen.tiendasFranquicia > 0) hojaFranquicias(wb, c);
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf as ArrayBuffer);
 }
