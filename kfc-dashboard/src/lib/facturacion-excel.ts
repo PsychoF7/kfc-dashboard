@@ -120,8 +120,8 @@ function hojaPrincipal(wb: ExcelJS.Workbook, c: CalculoFactura) {
     [`AL INICIO DE ${mesPago.toUpperCase()} ${partesMes(c.mesPago).y}`, "-", R.tiendasCobroFijo, 0, R.tiendasCobroFijo, N, f(costoDia), null, null],
     [`PROPORCIONAL DE ${mesOp} DELIVERY`, null, R.nuevasDelivery, R.nuevasDelivery, null, R.diasDelivery, f(costoDia), R.costoMensual, null],
     [`PROPORCIONAL DE ${mesOp} MI FLOTILLA`, null, R.nuevasFlotilla, R.nuevasFlotilla, null, R.diasFlotilla, f(costoDia), R.costoMensual, null],
-    ["Total a Facturar ", null, R.tiendasCobroFijo, null, R.tiendasCobroFijo, N, f(costoDia), null, null],
     [`FRANQUICIAS AL INICIO DE ${mesPago.toUpperCase()} ${partesMes(c.mesPago).y}`, null, R.tiendasFranquicia, R.nuevasFranquicia, null, null, "Costo variable*", null, R.montoFranquicia],
+    ["Total a Facturar ", null, R.tiendasCobroFijo + R.tiendasFranquicia, null, R.tiendasCobroFijo, N, f(costoDia), null, null],
     [null, null, null, null, null, null, f(costoDia), null, null],
   ];
   filasCobro.forEach((vals, i) => {
@@ -138,12 +138,12 @@ function hojaPrincipal(wb: ExcelJS.Workbook, c: CalculoFactura) {
     ws.getCell(r, 9).numFmt = MONEDA_1; // Fact proporcional
     ws.getCell(r, 10).numFmt = MONEDA;
     // Fact proporcional = costo x día × días (filas 1, 4, 5 y 6, como en tu archivo)
-    if (i === 0 || i === 3 || i === 5) ws.getCell(r, 9).value = f(`H${r}*G${r}`, i < 4 ? R.costoMensual : 0);
+    if (i === 0 || i === 4 || i === 5) ws.getCell(r, 9).value = f(`H${r}*G${r}`, i < 5 ? R.costoMensual : 0);
   });
   const rInicio = r0 + 1;
   ws.getCell(rInicio + 1, 10).value = f(`G${rInicio + 1}*H${rInicio + 1}`, R.proporcionalDelivery);
   ws.getCell(rInicio + 2, 10).value = f(`G${rInicio + 2}*H${rInicio + 2}`, R.proporcionalFlotilla);
-  ws.getCell(rInicio + 3, 10).value = f(`I${rInicio + 3}*F${rInicio + 3}`, R.montoBase);
+  ws.getCell(rInicio + 4, 10).value = f(`I${rInicio + 4}*F${rInicio + 4}`, R.montoBase);
 
   const rSuma = rInicio + filasCobro.length;
   const suma = ws.getCell(rSuma, 10);
