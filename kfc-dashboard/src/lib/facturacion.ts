@@ -13,9 +13,10 @@
 //   mes operado. Días a cobrar = de su primera orden al fin de mes.
 // · Cobro = tiendas × costo mensual + proporcional (días × costo ÷ días del
 //   mes operado), Delivery y Mi Flotilla por separado; + IVA.
-// · Franquicias (tiendas que terminan en "FQ"): $800 de base + $3 por cada
-//   orden del mes operado (todos los estatus), con tope de $1,500 por tienda.
-//   No llevan proporcional.
+// · Franquicias (tiendas que terminan en "FQ") NO van en esta factura: se
+//   facturan aparte, por tienda o por razón social (ver calcularFranquicias):
+//   $800 de base + $3 por cada orden del mes operado (todos los estatus), con
+//   tope de $1,500 por tienda. No llevan proporcional.
 
 export type TipoTienda = "delivery" | "flotilla" | "franquicia";
 
@@ -156,6 +157,14 @@ export function calcularFactura(p: {
   const diasMes = diasDelMes(mesOperado);
   const costoDiario = p.costoMensual / diasMes;
 
+  // La factura general es solo Delivery y Mi Flotilla: las franquicias se facturan aparte.
+  p = {
+    ...p,
+    ordenes: p.ordenes.filter((o) => tipoDe(o.restaurant) !== "franquicia"),
+    base: p.base.filter((b) => b.tipo !== "franquicia" && tipoDe(b.tienda) !== "franquicia"),
+    ajustes: p.ajustes.filter((a) => tipoDe(a.tienda) !== "franquicia"),
+  };
+
   // Órdenes del mes por tienda (por código, para que no importe si cambió el nombre)
   const porCodigo = new Map<string, { tienda: string; dias: number[] }>();
   for (const o of p.ordenes) {
@@ -279,3 +288,75 @@ export const NOMBRE_TIPO: Record<TipoTienda, string> = {
   flotilla: "Mi Flotilla",
   franquicia: "Franquicia",
 };
+
+// ---------------------------------------------------------------------
+// Franquicias: factura individual por tienda o por razón social
+// ---------------------------------------------------------------------
+
+export interface RazonSocial {
+  codigo: string;
+  razon_social: string;
+  rfc: string | null;
+  correo: string | null;
+}
+
+export interface FilaFranquicia {
+  codigo: string;
+  tienda: string;
+  razonSocial: string;
+  rfc: string | null;
+  /** Órdenes por día del mes operado (índice 0 = día 1) */
+  dias: number[];
+  ordenes: number;
+  base: number;
+  porOrden: number;
+  suma: number;
+  tope: boolean;
+  monto: number;
+  iva: number;
+  total: number;
+}
+
+export const SIN_RAZON = "Sin razón social";
+
+/** Una fila por tienda FQ con órdenes en el mes operado (todos los estatus). */
+export function calcularFranquicias(p: {
+  mesPago: string;
+  ordenes: OrdenesDia[];
+  razones: RazonSocial[];
+  iva: number;
+}): FilaFranquicia[] {
+  const diasMes = diasDelMes(mesAnterior(p.mesPago));
+  const razon = new Map(p.razones.map((r) => [r.codigo, r]));
+  const porCodigo = new Map<string, { tienda: string; dias: number[] }>();
+  for (const o of p.ordenes) {
+    if (!o.restaurant || o.dia < 1 || o.dia > diasMes || tipoDe(o.restaurant) !== "franquicia") continue;
+    const cod = codigoDe(o.restaurant);
+    const reg = porCodigo.get(cod) ?? { tienda: o.restaurant.trim(), dias: Array(diasMes).fill(0) };
+    reg.dias[o.dia - 1] += o.ordenes;
+    porCodigo.set(cod, reg);
+  }
+  const filas: FilaFranquicia[] = [];
+  for (const [codigo, d] of porCodigo) {
+    const ordenes = d.dias.reduce((s, n) => s + n, 0);
+    if (ordenes <= 0) continue;
+    const cob = cobroFranquicia(ordenes);
+    const rs = razon.get(codigo);
+    filas.push({
+      codigo,
+      tienda: d.tienda,
+      razonSocial: rs?.razon_social ?? SIN_RAZON,
+      rfc: rs?.rfc ?? null,
+      dias: d.dias,
+      ordenes,
+      base: FRANQUICIA.base,
+      porOrden: FRANQUICIA.porOrden * ordenes,
+      suma: cob.suma,
+      tope: cob.tope,
+      monto: cob.monto,
+      iva: redondear(cob.monto * p.iva),
+      total: redondear(cob.monto * (1 + p.iva)),
+    });
+  }
+  return filas.sort((a, b) => a.razonSocial.localeCompare(b.razonSocial) || a.tienda.localeCompare(b.tienda));
+}
