@@ -5,6 +5,7 @@ import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
 import { ESTADOS, FilaFactura, NOMBRE_TIPO, mesAnterior, mesSiguiente, nombreMes, nombreMesAnio, partesMes } from "@/lib/facturacion";
 import type { FacturaRespuesta } from "@/lib/facturacion-server";
+import type { FilaFranquicia } from "@/lib/facturacion";
 
 const money = (n: number | null | undefined, d = 2) =>
   n == null ? "—" : `$${n.toLocaleString("es-MX", { minimumFractionDigits: d, maximumFractionDigits: d })}`;
@@ -91,6 +92,140 @@ function Nota({
         {estado === "error" && <span className="text-danger">!</span>}
       </span>
     </div>
+  );
+}
+
+type FilaFq = Omit<FilaFranquicia, "dias">;
+
+function Franquicias({ mes }: { mes: string }) {
+  const [filas, setFilas] = useState<FilaFq[]>([]);
+  const [razones, setRazones] = useState<string[]>([]);
+  const [razon, setRazon] = useState("");
+  const [busqueda, setBusqueda] = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCargando(true);
+    setError(null);
+    fetch(`/api/facturacion/franquicias?mes=${mes.slice(0, 7)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.error) throw new Error(res.error);
+        setFilas(res.filas ?? []);
+        setRazones(res.razones ?? []);
+        setRazon("");
+      })
+      .catch((e) => setError(e.message ?? "No se pudieron cargar las franquicias."))
+      .finally(() => setCargando(false));
+  }, [mes]);
+
+  const visibles = useMemo(
+    () =>
+      filas.filter(
+        (f) => (!razon || f.razonSocial === razon) && f.tienda.toLowerCase().includes(busqueda.toLowerCase())
+      ),
+    [filas, razon, busqueda]
+  );
+  const subtotal = visibles.reduce((s, f) => s + f.monto, 0);
+  const total = visibles.reduce((s, f) => s + f.total, 0);
+  const base = `/api/facturacion/franquicias/excel?mes=${mes.slice(0, 7)}`;
+  const boton =
+    "rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50";
+
+  return (
+    <Seccion
+      titulo="Franquicias"
+      descripcion="Factura individual por tienda o por razón social."
+      resumen={<span>{filas.length} tiendas</span>}
+      abierta
+    >
+      {error && <p className="text-sm text-rose-700">{error}</p>}
+      {cargando ? (
+        <p className="text-sm text-ink-500">Cargando franquicias…</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={razon}
+              onChange={(e) => setRazon(e.target.value)}
+              className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            >
+              <option value="">Todas las razones sociales</option>
+              {razones.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar tienda…"
+              className="w-full max-w-xs rounded-md border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+            />
+            {razon && (
+              <a href={`${base}&razon=${encodeURIComponent(razon)}`} className={clsx(boton, "bg-brand-500 !text-white hover:bg-brand-600 border-brand-500")}>
+                Descargar factura de la razón social
+              </a>
+            )}
+          </div>
+          <div className="mt-3 max-h-[520px] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-white">
+                <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
+                  <th className="py-2 pr-4 font-medium">Tienda</th>
+                  <th className="py-2 pr-4 font-medium">Razón social</th>
+                  <th className="py-2 pr-4 text-right font-medium">Órdenes</th>
+                  <th className="py-2 pr-4 text-right font-medium">A facturar</th>
+                  <th className="py-2 pr-4 text-right font-medium">Con IVA</th>
+                  <th className="py-2 text-right font-medium"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibles.map((f) => (
+                  <tr key={f.codigo} className="border-b border-ink-100 last:border-0">
+                    <td className="py-1.5 pr-4 text-ink-900">{f.tienda}</td>
+                    <td className="py-1.5 pr-4 text-xs text-ink-500">{f.razonSocial}</td>
+                    <td className="py-1.5 pr-4 text-right tabular-nums">{int(f.ordenes)}</td>
+                    <td className="py-1.5 pr-4 text-right tabular-nums">
+                      {money(f.monto)}
+                      {f.tope && <span className="ml-1 text-[10px] text-ink-300">tope</span>}
+                    </td>
+                    <td className="py-1.5 pr-4 text-right tabular-nums">{money(f.total)}</td>
+                    <td className="py-1.5 text-right">
+                      <a href={`${base}&codigo=${encodeURIComponent(f.codigo)}`} className={boton}>
+                        Descargar
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+                {!visibles.length && (
+                  <tr>
+                    <td colSpan={6} className="py-4 text-center text-sm text-ink-500">
+                      Sin franquicias con órdenes en este mes.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              {visibles.length > 0 && (
+                <tfoot>
+                  <tr className="border-t border-ink-200 font-semibold">
+                    <td className="py-2 pr-4" colSpan={2}>
+                      Total ({visibles.length})
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{int(visibles.reduce((s, f) => s + f.ordenes, 0))}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{money(subtotal)}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{money(total)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </>
+      )}
+    </Seccion>
   );
 }
 
@@ -561,6 +696,8 @@ export default function FacturacionPage() {
                 </div>
               )}
             </Seccion>
+
+            {mes && <Franquicias mes={mes} />}
 
             <Seccion
               titulo="Detalle por tienda"
