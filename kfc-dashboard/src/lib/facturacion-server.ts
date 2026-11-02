@@ -6,6 +6,9 @@ import {
   OrdenesDia,
   TiendaBase,
   TipoTienda,
+  RazonSocial,
+  FilaFranquicia,
+  calcularFranquicias,
   calcularFactura,
   mesAnterior,
   mesSiguiente,
@@ -13,15 +16,9 @@ import {
   ultimoDia,
 } from "@/lib/facturacion";
 
-const esFranquicia = (nombre: string) => tipoDe(nombre) === "franquicia";
-
 async function ordenesDelMes(mesOperado: string): Promise<OrdenesDia[]> {
-  const [normales, franq] = await Promise.all([
-    ordenesRpc("get_fact_ordenes_mes", mesOperado),
-    // Franquicias cuentan todos los estatus (no solo completadas y devueltas)
-    ordenesRpc("get_fact_ordenes_mes_franq", mesOperado),
-  ]);
-  return [...normales.filter((o) => !esFranquicia(o.restaurant)), ...franq.filter((o) => esFranquicia(o.restaurant))];
+  // Las franquicias se facturan aparte (obtenerFranquicias)
+  return (await ordenesRpc("get_fact_ordenes_mes", mesOperado)).filter((o) => tipoDe(o.restaurant) !== "franquicia");
 }
 
 async function ordenesRpc(funcion: string, mesOperado: string): Promise<OrdenesDia[]> {
@@ -106,4 +103,22 @@ export async function obtenerFactura(mesPago: string): Promise<FacturaRespuesta>
 export function leerMes(valor: string | null) {
   if (!valor || !/^\d{4}-\d{2}/.test(valor)) return null;
   return `${valor.slice(0, 7)}-01`;
+}
+
+/** Franquicias del mes de pago (órdenes del mes anterior, todos los estatus), con su razón social. */
+export async function obtenerFranquicias(mesPago: string): Promise<{ filas: FilaFranquicia[]; razones: string[] }> {
+  const supabase = getSupabaseAdmin();
+  const [ordenes, razonesRes] = await Promise.all([
+    ordenesRpc("get_fact_ordenes_mes_franq", mesAnterior(mesPago)),
+    withRetryResult(() => supabase.from("fact_razones_sociales").select("codigo, razon_social, rfc, correo").limit(2000)),
+  ]);
+  if (razonesRes.error) throw new Error(razonesRes.error.message);
+  const filas = calcularFranquicias({
+    mesPago,
+    ordenes,
+    razones: (razonesRes.data ?? []) as RazonSocial[],
+    iva: 0.16,
+  });
+  const razones = Array.from(new Set(filas.map((f) => f.razonSocial))).sort((a, b) => a.localeCompare(b));
+  return { filas, razones };
 }
