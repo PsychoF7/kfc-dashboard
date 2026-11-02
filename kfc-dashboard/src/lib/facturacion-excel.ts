@@ -3,12 +3,12 @@ import { CalculoFactura, FRANQUICIA, FilaFactura, cobroFranquicia, nombreMes, pa
 
 // Mismo formato que tus facturas: Calibri 11, encabezados azul marino,
 // bloque de cobro verde/amarillo y TOTAL en rojo.
-const AZUL = "FF002060";
-const AZUL_CLARO = "FFB8D3EF";
-const VERDE = "FF92D050";
-const AMARILLO = "FFFFFF00";
-const NARANJA = "FFFFC000";
-const ROJO = "FFFF0000";
+const AZUL = "FF212135";
+const AZUL_CLARO = "FF7D8FFF";
+const VERDE = "FFE9EAF2";
+const AMARILLO = "FFF3E9FF";
+const NARANJA = "FFE6D1FF";
+const ROJO = "FF891DFF";
 const ROJO_TEXTO = "FFC00000";
 const BLANCO = "FFFFFFFF";
 const NEGRO = "FF000000";
