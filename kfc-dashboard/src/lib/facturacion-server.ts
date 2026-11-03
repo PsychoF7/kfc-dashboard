@@ -7,6 +7,7 @@ import {
   TiendaBase,
   TipoTienda,
   RazonSocial,
+  Franquiciatario,
   FilaFranquicia,
   calcularFranquicias,
   calcularFactura,
@@ -108,15 +109,19 @@ export function leerMes(valor: string | null) {
 /** Franquicias del mes de pago (órdenes del mes anterior, todos los estatus), con su razón social. */
 export async function obtenerFranquicias(mesPago: string): Promise<{ filas: FilaFranquicia[]; razones: string[] }> {
   const supabase = getSupabaseAdmin();
-  const [ordenes, razonesRes] = await Promise.all([
+  const [ordenes, razonesRes, contactosRes] = await Promise.all([
     ordenesRpc("get_fact_ordenes_mes_franq", mesAnterior(mesPago)),
     withRetryResult(() => supabase.from("fact_razones_sociales").select("codigo, razon_social, rfc, correo").limit(2000)),
+    withRetryResult(() => supabase.from("fact_franquiciatarios").select("razon_social, rfc, contacto, correo").limit(500)),
   ]);
   if (razonesRes.error) throw new Error(razonesRes.error.message);
+  // Si aún no existe la tabla de contactos, se sigue con el correo de cada tienda.
+  const contactos = (contactosRes.error ? [] : contactosRes.data ?? []) as Franquiciatario[];
   const filas = calcularFranquicias({
     mesPago,
     ordenes,
     razones: (razonesRes.data ?? []) as RazonSocial[],
+    contactos,
     iva: 0.16,
   });
   const razones = Array.from(new Set(filas.map((f) => f.razonSocial))).sort((a, b) => a.localeCompare(b));
