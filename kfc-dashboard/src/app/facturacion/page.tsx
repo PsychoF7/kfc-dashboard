@@ -97,13 +97,27 @@ function Nota({
 
 type FilaFq = Omit<FilaFranquicia, "dias">;
 
+interface Envio {
+  titulo: string;
+  codigo?: string;
+  razon?: string;
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+}
+
 function Franquicias({ mes }: { mes: string }) {
   const [filas, setFilas] = useState<FilaFq[]>([]);
   const [razones, setRazones] = useState<string[]>([]);
+  const [ccDefault, setCcDefault] = useState<string[]>([]);
   const [razon, setRazon] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [envio, setEnvio] = useState<Envio | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null);
 
   useEffect(() => {
     setCargando(true);
@@ -114,6 +128,7 @@ function Franquicias({ mes }: { mes: string }) {
         if (res?.error) throw new Error(res.error);
         setFilas(res.filas ?? []);
         setRazones(res.razones ?? []);
+        setCcDefault(res.cc ?? []);
         setRazon("");
       })
       .catch((e) => setError(e.message ?? "No se pudieron cargar las franquicias."))
@@ -130,8 +145,54 @@ function Franquicias({ mes }: { mes: string }) {
   const subtotal = visibles.reduce((s, f) => s + f.monto, 0);
   const total = visibles.reduce((s, f) => s + f.total, 0);
   const base = `/api/facturacion/franquicias/excel?mes=${mes.slice(0, 7)}`;
-  const boton =
-    "rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50";
+  const boton = "rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50";
+  const botonMarca = "rounded-lg border border-brand-500 bg-brand-500 px-3 py-1.5 text-xs font-semibold !text-white hover:bg-brand-600";
+
+  function abrirEnvio(f: { titulo: string; codigo?: string; razon?: string; correo: string | null }) {
+    setResultado(null);
+    setEnvio({
+      titulo: f.titulo,
+      codigo: f.codigo,
+      razon: f.razon,
+      to: f.correo ?? "",
+      cc: ccDefault.join(", "),
+      subject: `Factura de franquicia · ${f.titulo} · ${nombreMesAnio(mes)}`,
+      body:
+        `Buen día,\n\nCompartimos la factura de franquicia de ${f.titulo} correspondiente a ${nombreMesAnio(mes).toLowerCase()}, ` +
+        `con las órdenes operadas en ${nombreMesAnio(mesAnterior(mes)).toLowerCase()}.\n\nQuedamos atentos a cualquier duda.\n\nSaludos.`,
+    });
+  }
+
+  async function enviar() {
+    if (!envio) return;
+    setEnviando(true);
+    setResultado(null);
+    try {
+      const res = await fetch("/api/facturacion/franquicias/enviar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mes: mes.slice(0, 7),
+          codigo: envio.codigo,
+          razon: envio.razon,
+          to: envio.to,
+          cc: envio.cc,
+          subject: envio.subject,
+          body: envio.body,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.error) throw new Error(data?.error ?? "No se pudo enviar el correo.");
+      setResultado({ ok: true, texto: "Correo enviado." });
+    } catch (e) {
+      setResultado({ ok: false, texto: e instanceof Error ? e.message : "No se pudo enviar el correo." });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  const correoRazon = razon ? filas.find((f) => f.razonSocial === razon)?.correo ?? null : null;
+  const campo = "w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none";
 
   return (
     <Seccion
@@ -165,9 +226,28 @@ function Franquicias({ mes }: { mes: string }) {
               className="w-full max-w-xs rounded-md border border-ink-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
             />
             {razon && (
-              <a href={`${base}&razon=${encodeURIComponent(razon)}`} className={clsx(boton, "bg-brand-500 !text-white hover:bg-brand-600 border-brand-500")}>
-                Descargar factura de la razón social
-              </a>
+              <>
+                <a href={`${base}&razon=${encodeURIComponent(razon)}`} className={botonMarca}>
+                  Descargar factura
+                </a>
+                <button
+                  type="button"
+                  onClick={() => abrirEnvio({ titulo: razon, razon, correo: correoRazon })}
+                  className={boton}
+                >
+                  Enviar por correo
+                </button>
+              </>
+            )}
+            {!razon && filas.length > 0 && (
+              <div className="ml-auto flex flex-wrap gap-2">
+                <a href={`${base}&zip=razon`} className={boton}>
+                  Descargar todas (ZIP por razón social)
+                </a>
+                <a href={`${base}&zip=tienda`} className={boton}>
+                  Descargar todas (ZIP por tienda)
+                </a>
+              </div>
             )}
           </div>
           <div className="mt-3 max-h-[520px] overflow-auto">
@@ -176,6 +256,7 @@ function Franquicias({ mes }: { mes: string }) {
                 <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
                   <th className="py-2 pr-4 font-medium">Tienda</th>
                   <th className="py-2 pr-4 font-medium">Razón social</th>
+                  <th className="py-2 pr-4 font-medium">Correo</th>
                   <th className="py-2 pr-4 text-right font-medium">Órdenes</th>
                   <th className="py-2 pr-4 text-right font-medium">A facturar</th>
                   <th className="py-2 pr-4 text-right font-medium">Con IVA</th>
@@ -187,22 +268,30 @@ function Franquicias({ mes }: { mes: string }) {
                   <tr key={f.codigo} className="border-b border-ink-100 last:border-0">
                     <td className="py-1.5 pr-4 text-ink-900">{f.tienda}</td>
                     <td className="py-1.5 pr-4 text-xs text-ink-500">{f.razonSocial}</td>
+                    <td className="py-1.5 pr-4 text-xs text-ink-500">{f.correo ?? "—"}</td>
                     <td className="py-1.5 pr-4 text-right tabular-nums">{int(f.ordenes)}</td>
                     <td className="py-1.5 pr-4 text-right tabular-nums">
                       {money(f.monto)}
                       {f.tope && <span className="ml-1 text-[10px] text-ink-300">tope</span>}
                     </td>
                     <td className="py-1.5 pr-4 text-right tabular-nums">{money(f.total)}</td>
-                    <td className="py-1.5 text-right">
+                    <td className="whitespace-nowrap py-1.5 text-right">
                       <a href={`${base}&codigo=${encodeURIComponent(f.codigo)}`} className={boton}>
                         Descargar
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => abrirEnvio({ titulo: f.tienda, codigo: f.codigo, correo: f.correo })}
+                        className={clsx(boton, "ml-2")}
+                      >
+                        Enviar
+                      </button>
                     </td>
                   </tr>
                 ))}
                 {!visibles.length && (
                   <tr>
-                    <td colSpan={6} className="py-4 text-center text-sm text-ink-500">
+                    <td colSpan={7} className="py-4 text-center text-sm text-ink-500">
                       Sin franquicias con órdenes en este mes.
                     </td>
                   </tr>
@@ -211,7 +300,7 @@ function Franquicias({ mes }: { mes: string }) {
               {visibles.length > 0 && (
                 <tfoot>
                   <tr className="border-t border-ink-200 font-semibold">
-                    <td className="py-2 pr-4" colSpan={2}>
+                    <td className="py-2 pr-4" colSpan={3}>
                       Total ({visibles.length})
                     </td>
                     <td className="py-2 pr-4 text-right tabular-nums">{int(visibles.reduce((s, f) => s + f.ordenes, 0))}</td>
@@ -223,6 +312,57 @@ function Franquicias({ mes }: { mes: string }) {
               )}
             </table>
           </div>
+
+          {envio && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 p-4" role="dialog" aria-modal="true">
+              <div className="max-h-[90vh] w-full max-w-xl overflow-auto rounded-xl bg-white p-5 shadow-card">
+                <h3 className="text-base font-semibold text-ink-900">Enviar factura por correo</h3>
+                <p className="mt-1 text-sm text-ink-500">{envio.titulo}</p>
+                <div className="mt-4 space-y-3">
+                  <label className="block text-xs font-medium text-ink-500">
+                    Para
+                    <input value={envio.to} onChange={(e) => setEnvio({ ...envio, to: e.target.value })} className={clsx(campo, "mt-1")} />
+                  </label>
+                  <label className="block text-xs font-medium text-ink-500">
+                    Con copia
+                    <input value={envio.cc} onChange={(e) => setEnvio({ ...envio, cc: e.target.value })} className={clsx(campo, "mt-1")} />
+                  </label>
+                  <label className="block text-xs font-medium text-ink-500">
+                    Asunto
+                    <input value={envio.subject} onChange={(e) => setEnvio({ ...envio, subject: e.target.value })} className={clsx(campo, "mt-1")} />
+                  </label>
+                  <label className="block text-xs font-medium text-ink-500">
+                    Mensaje
+                    <textarea
+                      value={envio.body}
+                      onChange={(e) => setEnvio({ ...envio, body: e.target.value })}
+                      rows={7}
+                      className={clsx(campo, "mt-1")}
+                    />
+                  </label>
+                  <p className="text-xs text-ink-500">Se adjunta la factura en Excel.</p>
+                </div>
+                {resultado && (
+                  <p className={clsx("mt-3 text-sm", resultado.ok ? "text-success" : "text-rose-700")}>{resultado.texto}</p>
+                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setEnvio(null)} className={boton}>
+                    {resultado?.ok ? "Cerrar" : "Cancelar"}
+                  </button>
+                  {!resultado?.ok && (
+                    <button
+                      type="button"
+                      onClick={enviar}
+                      disabled={enviando || !envio.to.trim()}
+                      className={clsx(botonMarca, "disabled:opacity-40")}
+                    >
+                      {enviando ? "Enviando…" : "Enviar"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </Seccion>
