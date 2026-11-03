@@ -300,11 +300,36 @@ export interface RazonSocial {
   correo: string | null;
 }
 
+export interface Franquiciatario {
+  razon_social: string;
+  rfc: string | null;
+  contacto: string | null;
+  correo: string | null;
+}
+
+/** Con copia en todos los correos de facturas de franquicias (se puede editar al enviar). */
+export const CC_FACTURAS_FRANQUICIAS = [
+  "francisco.barragan@prb.com.mx",
+  "jair.michel@prb.com.mx",
+  "armando.alvarez@ambit.la",
+  "enrique.aguilera@ambit.la",
+];
+
+/** Nombre de archivo sin guiones bajos: "Factura Franquicia 1106 TORREON 1 Noviembre". */
+export function nombreArchivoFranquicia(sujeto: string, mesPago: string, esTienda: boolean) {
+  const limpio = (s: string) => s.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+  const base = esTienda ? limpio(sujeto.replace(/\s+FQ\s*$/i, "").replace(/\s+KFC\s*$/i, "")) : limpio(sujeto);
+  return `Factura Franquicia ${base} ${nombreMes(mesPago)}.xlsx`;
+}
+
 export interface FilaFranquicia {
   codigo: string;
   tienda: string;
   razonSocial: string;
   rfc: string | null;
+  /** Correo del franquiciatario (destinatario de la factura) */
+  correo: string | null;
+  contacto: string | null;
   /** Órdenes por día del mes operado (índice 0 = día 1) */
   dias: number[];
   ordenes: number;
@@ -324,8 +349,10 @@ export function calcularFranquicias(p: {
   mesPago: string;
   ordenes: OrdenesDia[];
   razones: RazonSocial[];
+  contactos?: Franquiciatario[];
   iva: number;
 }): FilaFranquicia[] {
+  const contacto = new Map((p.contactos ?? []).map((c) => [c.razon_social, c]));
   const diasMes = diasDelMes(mesAnterior(p.mesPago));
   const razon = new Map(p.razones.map((r) => [r.codigo, r]));
   const porCodigo = new Map<string, { tienda: string; dias: number[] }>();
@@ -347,6 +374,8 @@ export function calcularFranquicias(p: {
       tienda: d.tienda,
       razonSocial: rs?.razon_social ?? SIN_RAZON,
       rfc: rs?.rfc ?? null,
+      correo: contacto.get(rs?.razon_social ?? "")?.correo ?? rs?.correo ?? null,
+      contacto: contacto.get(rs?.razon_social ?? "")?.contacto ?? null,
       dias: d.dias,
       ordenes,
       base: FRANQUICIA.base,
