@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { leerMes, obtenerFranquicias } from "@/lib/facturacion-server";
+import { CC_FACTURAS_FRANQUICIAS } from "@/lib/facturacion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         razones,
+        cc: CC_FACTURAS_FRANQUICIAS,
         filas: filas.map(({ dias: _dias, ...resto }) => resto),
       },
       { headers: { "Cache-Control": "no-store" } }
