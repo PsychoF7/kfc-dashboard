@@ -267,8 +267,9 @@ function bloqueProporcional(ws: ExcelJS.Worksheet, inicio: number, titulo: strin
       `IF(COUNTA(${rango})=0, 0, ${N + 1} - MATCH(TRUE, INDEX(${rango}<>"", 0), 0))`,
       x.diasCobrar ?? 0
     );
-    ws.getCell(r, cCosto).value = f(costo, c.resumen.costoDiario);
-    ws.getCell(r, cMonto).value = f(`${L(cDias)}${r}*${L(cCosto)}${r}`, x.monto ?? 0);
+    ws.getCell(r, cCosto).value = f(costo, c.resumen.costoMensual / N);
+    // Valor sin redondear (como lo calcula Excel): así la suma de las filas cuadra con el total.
+    ws.getCell(r, cMonto).value = f(`${L(cDias)}${r}*${L(cCosto)}${r}`, (x.diasCobrar ?? 0) * (c.resumen.costoMensual / N));
     ws.getCell(r, cCosto).numFmt = CONTABLE;
     ws.getCell(r, cMonto).numFmt = CONTABLE;
     r++;
@@ -287,7 +288,7 @@ function bloqueProporcional(ws: ExcelJS.Worksheet, inicio: number, titulo: strin
     ws.getCell(r, cTotal).value = 0;
     ws.getCell(r, cDias).value = 0;
   }
-  ws.getCell(r, cCosto).value = f(costo, c.resumen.costoDiario);
+  ws.getCell(r, cCosto).value = f(costo, c.resumen.costoMensual / N);
   ws.getCell(r, cMonto).value = f(`${L(cCosto)}${r}*${L(cDias)}${r}`, totDias * (c.resumen.costoMensual / N));
   ws.getCell(r, cCosto).numFmt = CONTABLE;
   ws.getCell(r, cMonto).numFmt = CONTABLE;
