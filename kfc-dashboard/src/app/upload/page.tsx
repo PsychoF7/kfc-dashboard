@@ -5,6 +5,7 @@ import clsx from "clsx";
 import Papa from "papaparse";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { normalizeHeader } from "@/lib/parse/columns";
+import { leerExcelGrande } from "@/lib/parse/xlsx-stream";
 import { ENCABEZADOS_GENERAL } from "@/lib/reembolsos";
 
 type Tipo = "ops" | "ventas" | "tiempos" | "rappi";
@@ -60,6 +61,27 @@ async function leerExcel(file: File): Promise<unknown[][]> {
   return (filas as unknown[][]).map((fila) => fila.map((c) => (c instanceof Date ? fechaATexto(c) : c)));
 }
 
+// Los Excel muy grandes (más de ~20 MB) se leen fila por fila y solo se conservan las filas de KFC.
+const EXCEL_GRANDE = 20 * 1024 * 1024;
+
+async function leerExcelAuto(f: File): Promise<unknown[][]> {
+  const porPartes = async () => {
+    const r = await leerExcelGrande(f, (enc) => {
+      const i = enc.findIndex((h) => COLUMNAS_TIENDA.includes(normalizeHeader(String(h ?? ""))));
+      return i >= 0 ? (fila) => /kfc/i.test(String(fila[i] ?? "")) : null;
+    });
+    return [r.encabezados, ...r.filas];
+  };
+  if (f.size > EXCEL_GRANDE) return porPartes();
+  try {
+    const filas = await leerExcel(f);
+    if (filas.length > 1) return filas;
+  } catch {
+    // si el lector normal falla, se intenta fila por fila
+  }
+  return porPartes();
+}
+
 function leerCsv(file: File): Promise<string[][]> {
   return new Promise((resolve, reject) => {
     Papa.parse<string[]>(file, {
@@ -91,7 +113,7 @@ function UploadCard({ tipo, title, description }: { tipo: Tipo; title: string; d
     setStage("reading");
     // Dejamos que la pantalla muestre "Leyendo archivo…" antes de empezar a leer
     await new Promise((r) => setTimeout(r, 50));
-    const filas = f.name.toLowerCase().endsWith(".csv") ? await leerCsv(f) : await leerExcel(f);
+    const filas = f.name.toLowerCase().endsWith(".csv") ? await leerCsv(f) : await leerExcelAuto(f);
     const [encabezados, ...datos] = filas;
     const headers = (encabezados ?? []).map((h) => String(h ?? ""));
     if (!headers || datos.length === 0) throw new Error("El archivo está vacío o no se pudo leer.");
