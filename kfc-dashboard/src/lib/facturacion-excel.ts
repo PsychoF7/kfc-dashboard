@@ -16,6 +16,8 @@ const NEGRO = "FF000000";
 const MONEDA = "[$$]#,##0";
 const MONEDA_1 = "[$$]#,##0.0";
 const CONTABLE = '_-"$"* #,##0.00_-;\\-"$"* #,##0.00_-;_-"$"* "-"??_-;_-@_-';
+// Costo diario con 6 decimales: así al multiplicar días × costo en calculadora da el mismo monto.
+const CONTABLE_COSTO = '_-"$"* #,##0.000000_-;\\-"$"* #,##0.000000_-;_-"$"* "-"??_-;_-@_-';
 const thin = { style: "thin" as const, color: { argb: NEGRO } };
 const BORDE = { top: thin, left: thin, bottom: thin, right: thin };
 
@@ -270,7 +272,7 @@ function bloqueProporcional(ws: ExcelJS.Worksheet, inicio: number, titulo: strin
     ws.getCell(r, cCosto).value = f(costo, c.resumen.costoMensual / N);
     // Valor sin redondear (como lo calcula Excel): así la suma de las filas cuadra con el total.
     ws.getCell(r, cMonto).value = f(`${L(cDias)}${r}*${L(cCosto)}${r}`, (x.diasCobrar ?? 0) * (c.resumen.costoMensual / N));
-    ws.getCell(r, cCosto).numFmt = CONTABLE;
+    ws.getCell(r, cCosto).numFmt = CONTABLE_COSTO;
     ws.getCell(r, cMonto).numFmt = CONTABLE;
     r++;
   }
@@ -290,14 +292,14 @@ function bloqueProporcional(ws: ExcelJS.Worksheet, inicio: number, titulo: strin
   }
   ws.getCell(r, cCosto).value = f(costo, c.resumen.costoMensual / N);
   ws.getCell(r, cMonto).value = f(`${L(cCosto)}${r}*${L(cDias)}${r}`, totDias * (c.resumen.costoMensual / N));
-  ws.getCell(r, cCosto).numFmt = CONTABLE;
+  ws.getCell(r, cCosto).numFmt = CONTABLE_COSTO;
   ws.getCell(r, cMonto).numFmt = CONTABLE;
   return r;
 }
 
 function hojaProporcional(wb: ExcelJS.Workbook, c: CalculoFactura) {
   const N = c.diasMes;
-  const ws = wb.addWorksheet(`Proporcional ${nombreMes(c.mesPago)}`);
+  const ws = wb.addWorksheet(`Proporcional ${nombreMes(c.mesOperado)}`);
   ws.getColumn(1).width = 38;
   for (let i = 0; i < N; i++) ws.getColumn(2 + i).width = 4;
   ws.getColumn(2 + N).width = 8;
