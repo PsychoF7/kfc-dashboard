@@ -31,7 +31,7 @@ export async function obtenerReporteBase(weekStart: string, weekEnd: string, op:
   const [reporte, inc] = await Promise.all([
     // El reporte se guarda mientras no haya data ni notas nuevas
     conCache(
-      "dev-reporte",
+      "dev-reporte-delivery",
       paramsRep,
       async () => {
         const { data, error } = await withRetryResult(() => supabase.rpc("get_dev_reporte", paramsRep));
