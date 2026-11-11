@@ -633,7 +633,7 @@ function hojaRanking(wb: ExcelJS.Workbook, rep: DevReporte, op: DevOpciones) {
   const ws = prepararHoja(wb, "Ranking Nacional", { B: 39.4, C: 12, D: 12, E: 14, F: 14, G: 14, H: 3 });
   const canc = op.incluirRechazadas ? "Cancelacion/Rechazo" : "Cancelacion";
   barra(ws, 2, "RANKING NACIONAL DE TIENDAS: MEJORES Y PEORES", "G");
-  nota(ws, 3, `% Problema = % Devolución + % ${canc}, sobre el total de ordenes de cada tienda. Minimo 50 ordenes en la semana; no incluye tiendas Mi Flotilla (MF).`, "G", 27.75);
+  nota(ws, 3, `% Problema = % Devolución + % ${canc}, sobre el total de ordenes de cada tienda. Minimo 50 ordenes en la semana; solo tiendas Delivery (no incluye Mi Flotilla ni Franquicias).`, "G", 27.75);
   nota(
     ws,
     4,
