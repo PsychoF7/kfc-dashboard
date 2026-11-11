@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface MultiSelectFilterProps {
   label: string;
@@ -9,9 +10,8 @@ interface MultiSelectFilterProps {
   onChange: (selected: string[]) => void;
 }
 
-// Tiendas Mi Flotilla: su nombre termina en " MF". Franquicias: termina en " FQ".
+// Tiendas Mi Flotilla: su nombre termina en " MF"
 const esFlotilla = (item: string) => /\sMF$/i.test(String(item ?? "").trim());
-const esFranquicia = (item: string) => /\sFQ$/i.test(String(item ?? "").trim());
 
 export default function MultiSelectFilter({ label, items: itemsCrudos, selected, onChange }: MultiSelectFilterProps) {
   // Por si la lista trae vacíos (por ejemplo, órdenes sin zona o sin repartidor)
@@ -22,24 +22,50 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const botonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
+      const t = e.target as Node;
+      if (containerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+      setSearch("");
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Si es una lista de tiendas KFC con Delivery, Mi Flotilla y/o Franquicias, se separan en grupos
-  const delivery = useMemo(() => items.filter((i) => !esFlotilla(i) && !esFranquicia(i)), [items]);
+  // El menú se dibuja sobre toda la página (no queda tapado por las tarjetas de abajo)
+  useLayoutEffect(() => {
+    if (!open) return;
+    function acomodar() {
+      const r = botonRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const ancho = 288;
+      const alto = 380;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - ancho - 8));
+      const abajo = window.innerHeight - r.bottom;
+      if (abajo < alto && r.top > abajo) {
+        setPos({ left, bottom: window.innerHeight - r.top + 4 });
+      } else {
+        setPos({ left, top: r.bottom + 4 });
+      }
+    }
+    acomodar();
+    window.addEventListener("resize", acomodar);
+    window.addEventListener("scroll", acomodar, true);
+    return () => {
+      window.removeEventListener("resize", acomodar);
+      window.removeEventListener("scroll", acomodar, true);
+    };
+  }, [open]);
+
+  // Si es una lista de tiendas KFC con Delivery y Mi Flotilla, se separan en dos grupos
+  const delivery = useMemo(() => items.filter((i) => !esFlotilla(i)), [items]);
   const flotilla = useMemo(() => items.filter((i) => esFlotilla(i)), [items]);
-  const franquicia = useMemo(() => items.filter((i) => esFranquicia(i)), [items]);
-  const conGrupos =
-    items.some((i) => /kfc/i.test(i)) && delivery.length > 0 && (flotilla.length > 0 || franquicia.length > 0);
+  const conGrupos = items.some((i) => /kfc/i.test(i)) && delivery.length > 0 && flotilla.length > 0;
 
   const filteredItems = useMemo(() => {
     if (!search) return items;
@@ -63,9 +89,7 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
         ? `Solo Delivery (${delivery.length})`
         : conGrupos && igual(selected, flotilla)
           ? `Solo Mi Flotilla (${flotilla.length})`
-          : conGrupos && franquicia.length > 0 && igual(selected, franquicia)
-            ? `Solo Franquicias (${franquicia.length})`
-            : selected.length === items.length
+          : selected.length === items.length
             ? `Todas (${items.length})`
             : selected.length === 1
               ? selected[0]
@@ -95,15 +119,15 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
     </p>
   );
 
-  const filtradasDelivery = filteredItems.filter((i) => !esFlotilla(i) && !esFranquicia(i));
+  const filtradasDelivery = filteredItems.filter((i) => !esFlotilla(i));
   const filtradasFlotilla = filteredItems.filter((i) => esFlotilla(i));
-  const filtradasFranquicia = filteredItems.filter((i) => esFranquicia(i));
 
   return (
     <div className="flex flex-col gap-1" ref={containerRef}>
       <label className="text-xs font-medium text-ink-500">{label}</label>
       <div className="relative">
         <button
+          ref={botonRef}
           type="button"
           onClick={() => setOpen((o) => !o)}
           className="flex w-full items-center justify-between rounded-lg border border-ink-200 bg-white px-3 py-2 text-left text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
@@ -119,8 +143,12 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
           </svg>
         </button>
 
-        {open && (
-          <div className="absolute z-20 mt-1 w-72 rounded-lg border border-ink-200 bg-white shadow-lg">
+        {open && pos && typeof document !== "undefined" && createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: "fixed", left: pos.left, top: pos.top, bottom: pos.bottom, zIndex: 9999 }}
+            className="w-72 rounded-lg border border-ink-200 bg-white shadow-lg"
+          >
             <div className="border-b border-ink-100 p-2">
               <input
                 autoFocus
@@ -139,16 +167,9 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
                   <button type="button" onClick={() => onChange([...delivery])} className={`${boton} text-brand-600`}>
                     Solo Delivery ({delivery.length})
                   </button>
-                  {flotilla.length > 0 && (
-                    <button type="button" onClick={() => onChange([...flotilla])} className={`${boton} text-brand-600`}>
-                      Solo Mi Flotilla ({flotilla.length})
-                    </button>
-                  )}
-                  {franquicia.length > 0 && (
-                    <button type="button" onClick={() => onChange([...franquicia])} className={`${boton} text-brand-600`}>
-                      Solo Franquicias ({franquicia.length})
-                    </button>
-                  )}
+                  <button type="button" onClick={() => onChange([...flotilla])} className={`${boton} text-brand-600`}>
+                    Solo Mi Flotilla ({flotilla.length})
+                  </button>
                 </>
               )}
               <button
@@ -179,14 +200,13 @@ export default function MultiSelectFilter({ label, items: itemsCrudos, selected,
                   {filtradasDelivery.map(filaItem)}
                   {filtradasFlotilla.length > 0 && encabezadoGrupo("Mi Flotilla", filtradasFlotilla.length)}
                   {filtradasFlotilla.map(filaItem)}
-                  {filtradasFranquicia.length > 0 && encabezadoGrupo("Franquicias", filtradasFranquicia.length)}
-                  {filtradasFranquicia.map(filaItem)}
                 </>
               ) : (
                 filteredItems.map(filaItem)
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>
