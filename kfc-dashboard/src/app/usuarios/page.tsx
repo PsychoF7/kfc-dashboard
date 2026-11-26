@@ -11,8 +11,14 @@ interface Usuario {
   nombre: string;
   rol: Rol;
   activo: boolean;
+  alcance: string | null;
   created_at: string;
   ultimo_acceso: string | null;
+}
+
+interface Region {
+  valor: string;
+  etiqueta: string;
 }
 
 const campo =
@@ -26,10 +32,11 @@ function fecha(iso: string | null) {
 export default function UsuariosPage() {
   const yo = useSesion();
   const [lista, setLista] = useState<Usuario[]>([]);
+  const [regiones, setRegiones] = useState<Region[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
-  const [nuevo, setNuevo] = useState({ nombre: "", email: "", password: "", rol: "consulta" as Rol });
+  const [nuevo, setNuevo] = useState({ nombre: "", email: "", password: "", rol: "consulta" as Rol, alcance: "" });
   const [creando, setCreando] = useState(false);
   const [claveDe, setClaveDe] = useState<string | null>(null);
   const [claveNueva, setClaveNueva] = useState("");
@@ -41,6 +48,7 @@ export default function UsuariosPage() {
       const d = await res.json();
       if (!res.ok) throw new Error(d?.error ?? "No se pudo cargar.");
       setLista(d.usuarios);
+      setRegiones(d.regiones ?? []);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar.");
@@ -85,7 +93,7 @@ export default function UsuariosPage() {
       const d = await res.json().catch(() => null);
       if (!res.ok) throw new Error(d?.error ?? "No se pudo crear.");
       setAviso(`Usuario creado: ${nuevo.email}. Pásale su contraseña por un medio seguro.`);
-      setNuevo({ nombre: "", email: "", password: "", rol: "consulta" });
+      setNuevo({ nombre: "", email: "", password: "", rol: "consulta", alcance: "" });
       await cargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear.");
@@ -107,13 +115,19 @@ export default function UsuariosPage() {
 
       <div className="mt-6 rounded-xl border border-ink-100 bg-white p-5 shadow-card">
         <h2 className="text-sm font-semibold text-ink-900">Agregar usuario</h2>
-        <form onSubmit={crear} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <form onSubmit={crear} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <input className={campo} placeholder="Nombre" value={nuevo.nombre} onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })} required />
           <input className={campo} type="email" placeholder="Correo" value={nuevo.email} onChange={(e) => setNuevo({ ...nuevo, email: e.target.value })} required />
           <input className={campo} type="text" placeholder="Contraseña (mín. 8)" value={nuevo.password} onChange={(e) => setNuevo({ ...nuevo, password: e.target.value })} required minLength={8} autoComplete="off" />
           <select className={campo} value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as Rol })}>
             {ROLES.map((r) => (
               <option key={r} value={r}>{ETIQUETA_ROL[r]}</option>
+            ))}
+          </select>
+          <select className={campo} value={nuevo.alcance} disabled={nuevo.rol !== "consulta"} onChange={(e) => setNuevo({ ...nuevo, alcance: e.target.value })} aria-label="Región">
+            <option value="">Todo el país</option>
+            {regiones.map((r) => (
+              <option key={r.valor} value={r.valor}>{r.etiqueta}</option>
             ))}
           </select>
           <button type="submit" disabled={creando} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
@@ -132,6 +146,7 @@ export default function UsuariosPage() {
             <tr className="border-b border-ink-100 text-left text-xs text-ink-500">
               <th className="px-4 py-3 font-medium">Usuario</th>
               <th className="px-4 py-3 font-medium">Rol</th>
+              <th className="px-4 py-3 font-medium">Región</th>
               <th className="px-4 py-3 font-medium">Último acceso</th>
               <th className="px-4 py-3 font-medium">Estado</th>
               <th className="px-4 py-3 text-right font-medium">Acciones</th>
@@ -139,7 +154,7 @@ export default function UsuariosPage() {
           </thead>
           <tbody>
             {cargando && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-ink-500">Cargando…</td></tr>
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-500">Cargando…</td></tr>
             )}
             {!cargando && lista.map((u) => {
               const soyYo = u.id === (yo ? lista.find((x) => x.email === yo.email)?.id : undefined);
@@ -160,6 +175,23 @@ export default function UsuariosPage() {
                         <option key={r} value={r}>{ETIQUETA_ROL[r]}</option>
                       ))}
                     </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.rol === "consulta" ? (
+                      <select
+                        className={clsx(campo, "w-auto")}
+                        value={u.alcance ?? ""}
+                        onChange={(e) => cambiar(u.id, { alcance: e.target.value }, `Región de ${u.nombre} actualizada.`)}
+                        aria-label="Región"
+                      >
+                        <option value="">Todo el país</option>
+                        {regiones.map((r) => (
+                          <option key={r.valor} value={r.valor}>{r.etiqueta}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-ink-500">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-ink-500">{fecha(u.ultimo_acceso)}</td>
                   <td className="px-4 py-3">
