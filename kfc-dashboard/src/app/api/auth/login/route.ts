@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const admin = getSupabaseAdmin();
     const { data: perfil, error: errPerfil } = await admin
       .from("perfiles")
-      .select("rol, nombre, activo")
+      .select("rol, nombre, activo, alcance")
       .eq("id", data.user.id)
       .maybeSingle();
     if (errPerfil) {
@@ -53,6 +53,7 @@ export async function POST(req: Request) {
       email,
       nombre: perfil.nombre || email,
       rol: perfil.rol,
+      alcance: perfil.rol === "consulta" && perfil.alcance ? String(perfil.alcance) : null,
     }, duracion);
     const res = NextResponse.json({ ok: true, rol: perfil.rol });
     res.cookies.set(COOKIE, valor, {
