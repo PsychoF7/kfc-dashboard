@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import { sesionActual } from "@/lib/auth-server";
 import { huellaCodigo, normalizarCodigo } from "@/lib/credenciales-codigo";
+import { esRegional } from "@/lib/alcance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
   try {
     const sesion = await sesionActual();
     if (!sesion) return NextResponse.json({ error: "Sin sesión." }, { status: 401 });
+    if (esRegional(sesion)) return NextResponse.json({ error: "Tu usuario no tiene acceso a los usuarios master." }, { status: 403 });
     const quien = sesion.email || sesion.nombre || "desconocido";
     const supabase = getSupabaseAdmin();
 
