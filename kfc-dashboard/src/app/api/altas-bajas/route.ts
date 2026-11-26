@@ -4,6 +4,7 @@ import { withRetryResult } from "@/lib/supabase/retry";
 import { sesionActual } from "@/lib/auth-server";
 import { COLUMNAS_COMPLETAS, COLUMNAS_PUBLICAS } from "@/lib/altas-bajas";
 import { limpiarMovimiento } from "@/lib/altas-bajas-validar";
+import { alcanceDe, tiendaEnAlcance } from "@/lib/alcance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,11 @@ export async function GET() {
     console.error("Error en GET /api/altas-bajas:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ movimientos: data ?? [] }, { headers: NO_CACHE });
+  const alcance = await alcanceDe(sesion);
+  const movimientos = alcance
+    ? ((data ?? []) as unknown as { tienda_num: string | null; sucursal: string }[]).filter((m) => tiendaEnAlcance(alcance, m.tienda_num, m.sucursal))
+    : data ?? [];
+  return NextResponse.json({ movimientos }, { headers: NO_CACHE });
 }
 
 /** Registra un movimiento. */
