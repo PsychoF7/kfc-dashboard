@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const s = await sesionActual();
-  const sesion = s ? { email: s.email, nombre: s.nombre, rol: s.rol } : null;
+  const sesion = s ? { email: s.email, nombre: s.nombre, rol: s.rol, alcance: s.alcance ?? null } : null;
 
   return (
     <html lang="es" className={`${inter.variable} ${gantari.variable}`} suppressHydrationWarning>
