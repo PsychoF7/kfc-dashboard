@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import { sesionActual } from "@/lib/auth-server";
 import { COLUMNAS_PUBLICAS, type Movimiento } from "@/lib/altas-bajas";
+import { alcanceDe, tiendaEnAlcance } from "@/lib/alcance";
 import { COLUMNAS_CRED, agruparCredenciales, coincide, limpiarCredencial, type Credencial } from "@/lib/credenciales";
 
 export const runtime = "nodejs";
@@ -32,8 +33,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: cred.error.message }, { status: 500 });
   }
   // Si todavía no existe Altas y bajas, todo se considera vigente
-  const movs = (altas.error ? [] : altas.data ?? []) as unknown as Movimiento[];
-  let grupos = agruparCredenciales((cred.data ?? []) as unknown as Credencial[], movs);
+  const alcance = await alcanceDe(sesion);
+  let movs = (altas.error ? [] : altas.data ?? []) as unknown as Movimiento[];
+  let creds = (cred.data ?? []) as unknown as Credencial[];
+  if (alcance) {
+    movs = movs.filter((m) => tiendaEnAlcance(alcance, m.tienda_num, m.sucursal));
+    creds = creds.filter((c) => tiendaEnAlcance(alcance, c.tienda_num, c.sucursal));
+  }
+  let grupos = agruparCredenciales(creds, movs);
   if (q) grupos = grupos.filter((g) => coincide(g, q));
   const total = grupos.length;
   if (esConsulta) grupos = grupos.slice(0, MAX_KFC);
