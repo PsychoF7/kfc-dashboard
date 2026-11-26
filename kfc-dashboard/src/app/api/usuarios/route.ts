@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { sesionActual } from "@/lib/auth-server";
 import { esRol } from "@/lib/permisos";
+import { regionesDisponibles } from "@/lib/regiones";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,10 +17,10 @@ export async function GET() {
   if (!(await soloAdmin())) return NextResponse.json({ error: "Solo el administrador puede ver usuarios." }, { status: 403 });
   const { data, error } = await getSupabaseAdmin()
     .from("perfiles")
-    .select("id, email, nombre, rol, activo, created_at, ultimo_acceso")
+    .select("id, email, nombre, rol, activo, alcance, created_at, ultimo_acceso")
     .order("created_at", { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ usuarios: data ?? [] });
+  return NextResponse.json({ usuarios: data ?? [], regiones: await regionesDisponibles() });
 }
 
 /** Crea un usuario nuevo (cuenta en Supabase + perfil con su rol). */
@@ -34,6 +35,10 @@ export async function POST(req: Request) {
   if (!nombre) return NextResponse.json({ error: "Escribe un nombre." }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres." }, { status: 400 });
   if (!esRol(rol)) return NextResponse.json({ error: "Elige un rol." }, { status: 400 });
+  const alcance = rol === "consulta" && body?.alcance ? String(body.alcance) : null;
+  if (alcance && !(await regionesDisponibles()).some((r) => r.valor === alcance)) {
+    return NextResponse.json({ error: "Esa región no existe." }, { status: 400 });
+  }
 
   const admin = getSupabaseAdmin();
   const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
   }
   const { error: errPerfil } = await admin
     .from("perfiles")
-    .insert({ id: data.user.id, email, nombre, rol, activo: true });
+    .insert({ id: data.user.id, email, nombre, rol, activo: true, alcance });
   if (errPerfil) {
     await admin.auth.admin.deleteUser(data.user.id); // no dejar cuentas a medias
     return NextResponse.json({ error: errPerfil.message }, { status: 500 });
