@@ -2,6 +2,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import { conCache } from "@/lib/cache";
 import type { TiemposPanorama, ZonaRoja } from "@/lib/tiempos";
+import { sesionActual } from "@/lib/auth-server";
+import { acotar, alcanceDe, avisoEnAlcance } from "@/lib/alcance";
 
 function param(sp: URLSearchParams, key: string): string | null {
   const v = sp.get(key);
@@ -18,12 +20,13 @@ export async function obtenerTiempos(req: Request) {
   const sp = new URL(req.url).searchParams;
   const orden_planeada = param(sp, "orden_planeada");
   const supabase = getSupabaseAdmin();
+  const alcance = await alcanceDe(await sesionActual());
 
   const paramsPan = {
     p_date_from: param(sp, "date_from"),
     p_date_to: param(sp, "date_to"),
     p_ciudad: arrayParam(sp, "ciudad"),
-    p_restaurant: arrayParam(sp, "restaurant"),
+    p_restaurant: acotar(arrayParam(sp, "restaurant"), alcance?.nombres ?? null),
     p_zona: arrayParam(sp, "zona"),
     p_estatus: arrayParam(sp, "estatus"),
     p_repartido_por: arrayParam(sp, "repartido_por"),
@@ -47,6 +50,6 @@ export async function obtenerTiempos(req: Request) {
   ]);
   return {
     panorama,
-    zonasRojas: (zr.error ? [] : zr.data ?? []) as ZonaRoja[],
+    zonasRojas: ((zr.error ? [] : zr.data ?? []) as ZonaRoja[]).filter((z) => avisoEnAlcance(alcance, z.alcance, z.valores)),
   };
 }
