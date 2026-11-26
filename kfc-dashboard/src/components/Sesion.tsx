@@ -7,6 +7,7 @@ export interface DatosSesion {
   email: string;
   nombre: string;
   rol: Rol;
+  alcance?: string | null;
 }
 
 const Ctx = createContext<DatosSesion | null>(null);
