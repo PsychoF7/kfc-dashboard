@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import { filtrosDe, buscarDe } from "@/lib/reembolsos-filtros";
+import { sesionActual } from "@/lib/auth-server";
+import { alcanceDe } from "@/lib/alcance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +14,8 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const limite = 50;
   const pagina = Math.max(0, Number(sp.get("pagina")) || 0);
-  const params = { ...filtrosDe(req), p_buscar: buscarDe(req), p_limit: limite, p_offset: pagina * limite };
+  const alcance = await alcanceDe(await sesionActual());
+  const params = { ...filtrosDe(req, alcance?.codigos ?? null), p_buscar: buscarDe(req), p_limit: limite, p_offset: pagina * limite };
   try {
     const { data, error } = await withRetryResult(() => getSupabaseAdmin().rpc("get_reembolsos_detalle", params));
     if (error) throw new Error(error.message);
