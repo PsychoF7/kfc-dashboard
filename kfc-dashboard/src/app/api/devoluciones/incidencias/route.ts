@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
+import { sesionActual } from "@/lib/auth-server";
+import { alcanceDe, avisoEnAlcance } from "@/lib/alcance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +28,9 @@ export async function GET(req: Request) {
     console.error("Error en GET /api/devoluciones/incidencias:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ incidencias: data ?? [] }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  const alcance = await alcanceDe(await sesionActual());
+  const visibles = (data ?? []).filter((i) => avisoEnAlcance(alcance, i.alcance, i.alcance_valores));
+  return NextResponse.json({ incidencias: visibles }, { headers: { "Cache-Control": "no-store, max-age=0" } });
 }
 
 /** Crea una incidencia nueva, o la actualiza si viene con id. */
