@@ -3,13 +3,16 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import { conCache } from "@/lib/cache";
 import { filtrosDe } from "@/lib/reembolsos-filtros";
+import { sesionActual } from "@/lib/auth-server";
+import { alcanceDe } from "@/lib/alcance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  const params = filtrosDe(req);
+  const alcance = await alcanceDe(await sesionActual());
+  const params = filtrosDe(req, alcance?.codigos ?? null);
   const supabase = getSupabaseAdmin();
   try {
     const data = await conCache("reembolsos-panorama", params, async () => {
