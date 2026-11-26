@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { withRetryResult } from "@/lib/supabase/retry";
 import { conCache } from "@/lib/cache";
+import { sesionActual } from "@/lib/auth-server";
+import { acotar, alcanceDe } from "@/lib/alcance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,12 +24,13 @@ export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
 
   const orden_planeada = param(searchParams, "orden_planeada");
+  const alcance = await alcanceDe(await sesionActual());
 
   const params = {
     p_date_from: param(searchParams, "date_from"),
     p_date_to: param(searchParams, "date_to"),
     p_ciudad: arrayParam(searchParams, "ciudad"),
-    p_restaurant: arrayParam(searchParams, "restaurant"),
+    p_restaurant: acotar(arrayParam(searchParams, "restaurant"), alcance?.nombres ?? null),
     p_zona: arrayParam(searchParams, "zona"),
     p_estatus: arrayParam(searchParams, "estatus"),
     p_repartido_por: arrayParam(searchParams, "repartido_por"),
