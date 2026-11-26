@@ -426,7 +426,7 @@ export default function Credenciales() {
 
       <div className="mt-5">
         {vista === "master" && esAdmin ? <PanelMaster /> : tiendas}
-        {rol === "consulta" && (
+        {rol === "consulta" && !sesion?.alcance && (
           <div className="mt-8">
             <VerMasterKfc />
           </div>
