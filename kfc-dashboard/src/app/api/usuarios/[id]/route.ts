@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { sesionActual } from "@/lib/auth-server";
 import { esRol } from "@/lib/permisos";
+import { regionesDisponibles } from "@/lib/regiones";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (!esRol(body.rol)) return NextResponse.json({ error: "Rol inválido." }, { status: 400 });
     if (esYo && body.rol !== "admin") return NextResponse.json({ error: "No puedes quitarte tu propio rol de administrador." }, { status: 400 });
     cambios.rol = body.rol;
+  }
+  if (body.alcance !== undefined) {
+    const alcance = body.alcance ? String(body.alcance) : null;
+    if (alcance && !(await regionesDisponibles()).some((r) => r.valor === alcance)) {
+      return NextResponse.json({ error: "Esa región no existe." }, { status: 400 });
+    }
+    cambios.alcance = alcance;
   }
   if (body.activo !== undefined) {
     if (esYo && body.activo === false) return NextResponse.json({ error: "No puedes darte de baja a ti misma." }, { status: 400 });
