@@ -1,3 +1,5 @@
+import { acotar } from "@/lib/alcance";
+
 // Lee los filtros de la dirección (?desde=&hasta=&proveedor=&motivo=&estatus=&tienda=) y los
 // convierte a los parámetros de las funciones de Supabase.
 const lista = (sp: URLSearchParams, k: string) => {
@@ -5,7 +7,7 @@ const lista = (sp: URLSearchParams, k: string) => {
   return v.length ? v : null;
 };
 
-export function filtrosDe(req: Request) {
+export function filtrosDe(req: Request, codigosPermitidos: string[] | null = null) {
   const sp = new URL(req.url).searchParams;
   return {
     p_desde: sp.get("desde") || null,
@@ -13,7 +15,7 @@ export function filtrosDe(req: Request) {
     p_proveedor: lista(sp, "proveedor"),
     p_motivo: lista(sp, "motivo"),
     p_estatus: lista(sp, "estatus"),
-    p_tiendas: lista(sp, "tienda"),
+    p_tiendas: acotar(lista(sp, "tienda"), codigosPermitidos),
   };
 }
 
