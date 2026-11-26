@@ -16,6 +16,7 @@ export interface Sesion {
   email: string;
   nombre: string;
   rol: Rol;
+  alcance?: string | null; // coordinador cuyas tiendas puede ver (vacío = todo el país)
   exp: number; // segundos desde 1970
 }
 
