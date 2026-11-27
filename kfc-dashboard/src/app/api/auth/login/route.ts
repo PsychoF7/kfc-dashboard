@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { COOKIE, DURACION_LARGA_SEG, DURACION_SEG, firmarSesion } from "@/lib/sesion";
 import { esRol } from "@/lib/permisos";
+import { estadoMantenimiento } from "@/lib/mantenimiento";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +45,12 @@ export async function POST(req: Request) {
         { error: "Tu usuario no tiene acceso al panel. Pide que te den de alta." },
         { status: 403 }
       );
+    }
+
+    // En mantenimiento solo entra el administrador.
+    if (perfil.rol !== "admin") {
+      const m = await estadoMantenimiento();
+      if (m.activo) return NextResponse.json({ error: m.mensaje, mantenimiento: true }, { status: 503 });
     }
 
     await admin.from("perfiles").update({ ultimo_acceso: new Date().toISOString() }).eq("id", data.user.id);
