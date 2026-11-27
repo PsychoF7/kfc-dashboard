@@ -40,6 +40,7 @@ const APIS_CONSULTA_GET = [
   "/api/reembolsos/detalle",
   "/api/altas-bajas",
   "/api/credenciales",
+  "/api/avisos",
 ];
 
 function empieza(ruta: string, base: string) {
@@ -58,6 +59,7 @@ export function paginaPermitida(rol: Rol, ruta: string): boolean {
 export function apiPermitida(rol: Rol, ruta: string, metodo: string): boolean {
   if (empieza(ruta, "/api/auth")) return true;
   if (empieza(ruta, "/api/usuarios")) return rol === "admin";
+  if (empieza(ruta, "/api/mantenimiento")) return rol === "admin";
   // Credenciales: los códigos y los usuarios master son solo del administrador;
   // canjear un código lo puede hacer cualquier rol (así KFC ve los master).
   if (ruta === "/api/credenciales/master/revelar") return metodo === "POST";
