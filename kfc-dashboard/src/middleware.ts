@@ -1,15 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, leerSesion } from "@/lib/sesion";
 import { apiPermitida, paginaPermitida, INICIO } from "@/lib/permisos";
+import { estadoMantenimiento } from "@/lib/mantenimiento";
 
 // Guardia de toda la app: sin sesión válida no se entra, y cada rol solo llega
 // a lo que le toca (tanto a las pantallas como a los datos de la API).
+// Con el modo mantenimiento activo, solo el administrador sigue entrando.
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const esApi = pathname.startsWith("/api/");
 
-  // Rutas públicas: la pantalla de entrada y el inicio/cierre de sesión.
-  if (pathname === "/login" || pathname === "/api/auth/login" || pathname === "/api/auth/salir") {
+  // Rutas públicas: la pantalla de entrada, el inicio/cierre de sesión y el estado de mantenimiento.
+  if (
+    pathname === "/login" ||
+    pathname === "/api/auth/login" ||
+    pathname === "/api/auth/salir" ||
+    pathname === "/api/auth/estado"
+  ) {
     return NextResponse.next();
   }
 
@@ -27,6 +34,18 @@ export async function middleware(req: NextRequest) {
     url.search = "";
     if (pathname !== "/" && pathname !== INICIO) url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Mantenimiento: todo se detiene para quien no sea administrador.
+  if (sesion.rol !== "admin") {
+    const m = await estadoMantenimiento();
+    if (m.activo) {
+      if (esApi) {
+        return NextResponse.json({ error: m.mensaje, mantenimiento: true }, { status: 503 });
+      }
+      if (pathname !== "/mantenimiento") return NextResponse.redirect(new URL("/mantenimiento", req.url));
+      return NextResponse.next();
+    }
   }
 
   if (esApi) {
