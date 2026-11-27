@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { useSesion } from "@/components/Sesion";
+import { useAvisos, fechaCorta } from "@/components/Avisos";
 import { ETIQUETA_ROL, paginaPermitida } from "@/lib/permisos";
 
 // Íconos simples (trazo), para que el menú se entienda aun contraído.
@@ -30,6 +31,7 @@ const AVAILABLE = [
   { href: "/credenciales", label: "Credenciales", icono: <Icono><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2 20 3M16 7l3 3M14 9l2 2" /></Icono> },
   { href: "/reembolsos", label: "Reembolsos", icono: <Icono><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v8M9.5 14.2c.5.9 1.4 1.3 2.5 1.3 1.4 0 2.5-.7 2.5-1.8 0-2.3-5-1.2-5-3.5 0-1 1-1.7 2.5-1.7 1 0 1.9.4 2.4 1.2" /></Icono> },
   { href: "/bugs", label: "Bugs", icono: <Icono><path d="M9 9V7a3 3 0 0 1 6 0v2" /><rect x="7" y="9" width="10" height="11" rx="5" /><path d="M12 13v4M3 13h4M17 13h4M4.5 6.5 7.5 9M19.5 6.5 16.5 9M4.5 19.5 7.5 17M19.5 19.5 16.5 17" /></Icono> },
+  { href: "/avisos", label: "Avisos", icono: <Icono><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" /><path d="M10 20a2 2 0 0 0 4 0" /></Icono> },
   { href: "/usuarios", label: "Usuarios y permisos", icono: <Icono><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></Icono> },
   { href: "/desarrollos", label: "Solicitudes de desarrollo", icono: <Icono><path d="m8 8-5 4 5 4" /><path d="m16 8 5 4-5 4" /><path d="m14 5-4 14" /></Icono> },
 ];
@@ -37,7 +39,6 @@ const AVAILABLE = [
 // Estas secciones son las fases siguientes del proyecto — se muestran
 // para que el roadmap sea transparente, pero aún no están construidas.
 const ROADMAP = [
-  { label: "Avisos y actualizaciones", href: "/avisos" },
   { label: "Materiales", href: "/materiales" },
 ];
 
@@ -47,6 +48,7 @@ const LLAVE_TEMA = "kfc-tema";
 export default function Sidebar() {
   const pathname = usePathname();
   const sesion = useSesion();
+  const { pendientes, datosHasta, abrirPanel } = useAvisos();
   const rol = sesion?.rol ?? "consulta";
   const visibles = AVAILABLE.filter((i) => paginaPermitida(rol, i.href));
   const proximos = ROADMAP.filter((i) => paginaPermitida(rol, i.href));
@@ -159,6 +161,32 @@ export default function Sidebar() {
       </nav>
 
       <div className="space-y-1 border-t border-ink-100 p-3">
+        {sesion && (
+          <button
+            type="button"
+            onClick={abrirPanel}
+            title={datosHasta ? `Avisos · Datos al ${fechaCorta(datosHasta)}` : "Avisos"}
+            aria-label="Ver avisos"
+            className={clsx(
+              "relative flex w-full items-center rounded-xl py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-900",
+              contraido ? "justify-center" : "gap-3 px-3"
+            )}
+          >
+            <Icono>
+              <path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9" />
+              <path d="M10 20a2 2 0 0 0 4 0" />
+            </Icono>
+            {!contraido && <span>Avisos</span>}
+            {pendientes > 0 && (
+              <span className={clsx("flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white", contraido ? "absolute right-1 top-1" : "ml-auto")}>
+                {pendientes}
+              </span>
+            )}
+          </button>
+        )}
+        {sesion && datosHasta && !contraido && (
+          <p className="px-3 pb-1 text-xs text-ink-500">Datos al {fechaCorta(datosHasta)}</p>
+        )}
         <button
           type="button"
           onClick={alternarTema}
