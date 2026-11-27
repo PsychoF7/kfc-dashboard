@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { META_MINUTOS, type TiemposPanorama, type ZonaRoja, zonasRojasDe } from "./tiempos";
+import { META_MINUTOS, type TiemposPanorama, type ZonaRoja, zonasRojasDe, gruposDeTiempo } from "./tiempos";
 
 // Mismo estilo que el reporte de devoluciones
 const C = { oscuro: "FF212135", morado: "FF891DFF", gris: "FFE9EAF2", blanco: "FFFFFFFF", texto: "FF212135", sutil: "FF6B6B7B" };
@@ -103,8 +103,9 @@ export async function construirExcelTiempos(p: TiemposPanorama, zonas: ZonaRoja[
   const ind: [string, ExcelJS.CellValue, Fmt][] = [
     ["Órdenes completadas", k.completadas, "int"],
     ["Tiempo total promedio (min)", k.total_prom, "min"],
-    [`Entregadas en menos de ${META_MINUTOS} min`, k.pct_45, "pct"],
-    ["Entregadas en menos de 60 min", k.pct_60, "pct"],
+    [`Entregadas en menos de ${META_MINUTOS} min`, gruposDeTiempo(k.pct_45, k.pct_60).menos45 ?? k.pct_45, "pct"],
+    ["Entregadas entre 45 y 60 min", gruposDeTiempo(k.pct_45, k.pct_60).entre, "pct"],
+    ["Entregadas en más de 60 min", gruposDeTiempo(k.pct_45, k.pct_60).mas60, "pct"],
     ["Hasta que el repartidor sale con la orden (min, promedio)", k.recol_prom, "min"],
     ["Hasta que el repartidor sale con la orden (min, mediana)", k.recol_med, "min"],
     ["Entrega al cliente (min)", k.entrega_prom, "min"],
