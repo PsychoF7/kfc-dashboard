@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 function Formulario() {
@@ -11,6 +11,14 @@ function Formulario() {
   const [recordar, setRecordar] = useState(true);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mantenimiento, setMantenimiento] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/estado", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setMantenimiento(d?.mantenimiento?.activo ? String(d.mantenimiento.mensaje ?? "") : null))
+      .catch(() => {});
+  }, []);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +52,13 @@ function Formulario() {
         <img src="/logo.png" alt="Panel Operativo" width={44} height={44} className="h-11 w-11 rounded-xl" />
         <p className="font-display text-base font-semibold text-ink-900">Panel Operativo</p>
       </div>
+
+      {mantenimiento !== null && (
+        <div className="mt-6 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3" role="status">
+          <p className="text-sm font-semibold text-ink-900">Panel en mantenimiento</p>
+          <p className="mt-1 whitespace-pre-line text-sm text-ink-700">{mantenimiento}</p>
+        </div>
+      )}
 
       <h1 className="font-display mt-7 text-xl font-semibold text-ink-900">Iniciar sesión</h1>
       <p className="mt-1 text-sm text-ink-500">Entra con tu correo y tu contraseña.</p>
