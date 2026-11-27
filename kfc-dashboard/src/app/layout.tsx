@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Gantari } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import { SesionProvider } from "@/components/Sesion";
+import { AvisosProvider } from "@/components/Avisos";
 import { sesionActual } from "@/lib/auth-server";
 import "./globals.css";
 
@@ -30,15 +31,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className={inter.className}>
         <SesionProvider sesion={sesion}>
-          {sesion ? (
-            <div className="flex h-screen w-full overflow-hidden">
-              <Sidebar />
-              <main className="flex-1 overflow-y-auto">{children}</main>
-            </div>
-          ) : (
-            // Sin sesión (pantalla de entrada): sin menú lateral
-            <main className="min-h-screen">{children}</main>
-          )}
+          <AvisosProvider activo={!!sesion}>
+            {sesion ? (
+              <div className="flex h-screen w-full overflow-hidden">
+                <Sidebar />
+                <main className="flex-1 overflow-y-auto">{children}</main>
+              </div>
+            ) : (
+              // Sin sesión (pantalla de entrada): sin menú lateral
+              <main className="min-h-screen">{children}</main>
+            )}
+          </AvisosProvider>
         </SesionProvider>
       </body>
     </html>
