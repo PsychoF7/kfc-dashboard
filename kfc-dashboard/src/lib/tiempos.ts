@@ -151,3 +151,11 @@ export function filtrosAQuery(f: DashboardFilters) {
   if (f.price_max != null) p.set("price_max", String(f.price_max));
   return p.toString();
 }
+
+/** Reparte las órdenes en tres grupos que suman exactamente 100 %: menos de 45, entre 45 y 60, y más de 60. */
+export function gruposDeTiempo(p45: number | null | undefined, p60: number | null | undefined) {
+  if (p45 == null || p60 == null) return { menos45: null, entre: null, mas60: null };
+  const a = Math.round(p45 * 1000);
+  const c = Math.round((1 - p60) * 1000);
+  return { menos45: a / 1000, entre: (1000 - a - c) / 1000, mas60: c / 1000 };
+}
