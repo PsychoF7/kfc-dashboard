@@ -20,8 +20,7 @@ import {
   filtrosAQuery,
   minutos,
   pctTxt,
-  zonasRojasDe,
-} from "@/lib/tiempos";
+  zonasRojasDe, gruposDeTiempo } from "@/lib/tiempos";
 
 const MapaTiempos = dynamic(() => import("@/components/tiempos/MapaTiempos"), {
   ssr: false,
@@ -637,7 +636,7 @@ export default function TiemposPage() {
         />
         <KpiCard
           label="Entregadas en menos de 45 min"
-          value={cargando(pctTxt(k?.pct_45))}
+          value={cargando(pctTxt(gruposDeTiempo(k?.pct_45, k?.pct_60).menos45 ?? k?.pct_45))}
           sublabel={
             hayAnterior && k?.pct_45 != null && k.ant_pct_45 != null
               ? `${k.pct_45 >= k.ant_pct_45 ? "▲" : "▼"} ${Math.abs((k.pct_45 - k.ant_pct_45) * 100).toFixed(1)} pts vs periodo anterior`
@@ -645,7 +644,8 @@ export default function TiemposPage() {
           }
           accent={(k?.pct_45 ?? 0) >= 0.8 ? "success" : "warning"}
         />
-        <KpiCard label="Entregadas en menos de 60 min" value={cargando(pctTxt(k?.pct_60))} />
+        <KpiCard label="Entregadas entre 45 y 60 min" value={cargando(pctTxt(gruposDeTiempo(k?.pct_45, k?.pct_60).entre))} />
+        <KpiCard label="Entregadas en más de 60 min" value={cargando(pctTxt(gruposDeTiempo(k?.pct_45, k?.pct_60).mas60))} />
         <KpiCard
           label="Hasta que sale el repartidor"
           value={cargando(minutos(k?.recol_prom))}
