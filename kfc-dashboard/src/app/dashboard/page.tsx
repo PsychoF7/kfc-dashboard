@@ -1,5 +1,6 @@
 "use client";
 
+import { fechaCorta } from "@/components/Avisos";
 import { useEffect, useMemo, useState } from "react";
 import FiltersBar from "@/components/FiltersBar";
 import KpiCard from "@/components/KpiCard";
@@ -19,6 +20,13 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
     return () => clearTimeout(timer);
   }, [value, delayMs]);
   return debounced;
+}
+
+function periodoMostrado(desde?: string | null, hasta?: string | null): string {
+  if (desde && hasta) return desde === hasta ? `Mostrando el ${fechaCorta(desde)}` : `Mostrando del ${fechaCorta(desde)} al ${fechaCorta(hasta)}`;
+  if (desde) return `Mostrando desde el ${fechaCorta(desde)}`;
+  if (hasta) return `Mostrando hasta el ${fechaCorta(hasta)}`;
+  return "Mostrando todas las fechas cargadas";
 }
 
 export default function DashboardPage() {
@@ -70,6 +78,7 @@ export default function DashboardPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-ink-900">Panel principal</h1>
+          <p className="mt-1 text-sm text-ink-500">{periodoMostrado(filters.date_from, filters.date_to)}</p>
         </div>
       </div>
 
