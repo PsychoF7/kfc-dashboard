@@ -1,5 +1,6 @@
 "use client";
 
+import { gruposDeTiempo } from "@/lib/tiempos";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import KpiCard from "@/components/KpiCard";
@@ -410,7 +411,12 @@ export default function FranquiciasPage() {
           }
           accent={(k?.total_prom ?? 99) <= META ? "success" : "danger"}
         />
-        <KpiCard label="Entregadas en menos de 45 min" value={cargando(pct(k?.pct_45))} sublabel={`${pct(k?.pct_60)} en menos de 60`} accent="success" />
+        <KpiCard
+          label="Entregadas en menos de 45 min"
+          value={cargando(pct(gruposDeTiempo(k?.pct_45, k?.pct_60).menos45 ?? k?.pct_45))}
+          sublabel={`${pct(gruposDeTiempo(k?.pct_45, k?.pct_60).entre)} entre 45 y 60 · ${pct(gruposDeTiempo(k?.pct_45, k?.pct_60).mas60)} más de 60`}
+          accent="success"
+        />
         <KpiCard
           label="% Devolución"
           value={cargando(pct(k?.pct_dev, 2))}
